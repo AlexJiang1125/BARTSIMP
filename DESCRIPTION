@@ -1,0 +1,20 @@
+Package: BARTSIMP
+Title: BART for Spatial INLA Modeling and Prediction
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Alex Ziyu",
+           family = "Jiang",
+           role = c("aut", "cre"),
+           email = "jiang14@uw.edu",
+           comment = c(ORCID = "0009-0002-7733-2612"))
+Description: BART for Spatial INLA Modeling and Prediction.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Depends: INLA
+LinkingTo: 
+    Rcpp, RcppArmadillo
+Imports: 
+    Rcpp
