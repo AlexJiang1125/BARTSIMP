@@ -1,5 +1,6 @@
 #ifndef GUARD_makeC_h
 #define GUARD_makeC_h
+//#define ARMA_USE_SUPERLU 1
 
 #include "common.h"
 //#include <Rcpp.h>

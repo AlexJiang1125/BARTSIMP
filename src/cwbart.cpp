@@ -24,6 +24,7 @@
 #include "bd.h"
 #include "bart.h"
 #include "heterbart.h"
+#include <time.h>
 
 #ifndef NoRcpp
 
@@ -55,6 +56,8 @@ RcppExport SEXP cwbart(
     SEXP _isigest,
     SEXP _irho0,
     SEXP _isigmam0,
+    SEXP _ialpha_1,
+    SEXP _ialpha_2,
     SEXP _irange_new,
     SEXP _isig_m_new,
     SEXP _isigest_new,
@@ -75,15 +78,18 @@ RcppExport SEXP cwbart(
     //   SEXP _treesaslists,
     SEXP _Xinfo,
     SEXP _iftest,
+    SEXP _isexact,
     SEXP _inwarmup,
     SEXP _usecoords,
     SEXP _treeupdate,
-    SEXP _treeprev
+    SEXP _treeprev,
+    SEXP _dobart
 )
 {
 
   //--------------------------------------------------
   //process args
+  srand(time(NULL));
   size_t n = Rcpp::as<int>(_in);
   size_t p = Rcpp::as<int>(_ip);
   size_t np = Rcpp::as<int>(_inp);
@@ -115,6 +121,8 @@ RcppExport SEXP cwbart(
   double nu = Rcpp::as<double>(_inu);
   double rho_0 = Rcpp::as<double>(_irho0);
   double sigmam_0 = Rcpp::as<double>(_isigmam0);
+  double alpha_1 = Rcpp::as<double>(_ialpha_1);
+  double alpha_2 = Rcpp::as<double>(_ialpha_2);
   double range_new = Rcpp::as<double>(_irange_new);
   double sig_m_new = Rcpp::as<double>(_isig_m_new);
   double sigest_new = Rcpp::as<double>(_isigest_new);
@@ -130,7 +138,9 @@ RcppExport SEXP cwbart(
   double rho = Rcpp::as<double>(_irho);
   bool aug;
   bool iftest = Rcpp::as<bool>(_iftest);
+  bool isexact = Rcpp::as<bool>(_isexact);
   bool usecoords = Rcpp::as<bool>(_usecoords);
+  bool dobart = Rcpp::as<bool>(_dobart);
   if(Rcpp::as<int>(_iaug)==1) aug=true;
   else aug=false;
   double theta = Rcpp::as<double>(_itheta);
@@ -212,6 +222,8 @@ RcppExport SEXP cwbart(
       double sigma,
       double rho_0,
       double sigmam_0,
+      double alpha_1,
+      double alpha_2,
       double range_new,
       double sig_m_new,
       double sigest_new,
@@ -238,12 +250,20 @@ RcppExport SEXP cwbart(
       double* _trdraw,
       double* _tedraw,
       bool iftest,
+      bool isexact,
       bool usecoords,
       size_t nwarmup,
       bool treeupdate,
-      Rcpp::List treeprev
+      Rcpp::List treeprev,
+      bool dobart,
   )
   {
+
+    srand(time(NULL));
+
+    Rcpp::Environment base_env("package:base");
+    Rcpp::Function set_seed_r = base_env["set.seed"];
+    set_seed_r(12345);
 
     //return data structures (using C++)
     std::vector<double*> trdraw(nkeeptrain);
@@ -280,8 +300,10 @@ RcppExport SEXP cwbart(
 
     //--------------------------------------------------
     //print args
-    lambda = 5;
-    nu = 5;
+    //lambda = 5;
+    //nu = 5;
+
+    //arma::arma_rng::set_seed_random();
 
     printf("*****Data:\n");
     printf("data:n,p,np: %zu, %zu, %zu\n",n,p,np);
@@ -319,14 +341,18 @@ RcppExport SEXP cwbart(
     }
     bm.setdata(p,n,nunique,ix,iy,ixunique,rs1,rs2,rsize_dat,numcut[0]);
     bm.setdart(a,b,rho,aug,dart,theta,omega);
-    cout << "usecoords" << usecoords;
+    //cout << "usecoords" << usecoords;
     if (usecoords) {
       cout << "usecoords" << endl;
       bm.makemesh_bypoints();
+      cout << "usecoords1" << endl;
+      bm.makemesh_bypoints_unique();
     } else {
-      cout << "notusecoords" << endl;
+      //cout << "notusecoords" << endl;
       bm.makemesh();
     }
+    cout << "usecoords2" << endl;
+
 
     //--------------------------------------------------
     //sigma
@@ -341,8 +367,8 @@ RcppExport SEXP cwbart(
     bm.getpinfo().sigma2e = sigest_new*sigest_new;
     bm.getpinfo().sigma2x = sig_m_new*sig_m_new;
     bm.getpinfo().kappa = sqrt(8)/range_new;
-    bm.getpinfo().alpha_1 = 0.05;
-    bm.getpinfo().alpha_2 = 0.05;
+    bm.getpinfo().alpha_1 = alpha_1;//0.05;
+    bm.getpinfo().alpha_2 = alpha_2;//0.05;
     double kappa = bm.getpinfo().kappa;
     double sigma_m = std::sqrt(bm.getpinfo().sigma2x);
 
@@ -382,7 +408,7 @@ RcppExport SEXP cwbart(
     xinfo& xi = bm.getxinfo();
     Rcpp::List treeout;
     bm.initializetrees();
-    cout << "treeupdate " << treeupdate << endl;
+    //cout << "treeupdate " << treeupdate << endl;
     if (treeupdate) {
       bm.updatetrees(treeprev);
     }
@@ -395,18 +421,22 @@ RcppExport SEXP cwbart(
     for(size_t i=0;i<(nd+nwarmup+burn);i++) {
       if(i%printevery==0) printf("done %zu (out of %lu)\n",i,nd+burn);
       if(i==(burn/2)&&dart) bm.startdart();
-      //draw bart
-      //if(i< nwarmup) {
-      //  iftest = false;
-      //} else {
-      //  iftest = true;
-      //}
+      // draw bart
+      if(i< nwarmup) {
+       iftest = false;
+      } else {
+        if (dobart) {
+          iftest = false;
+        } else {
+          iftest = true;
+        }
+      }
       if (i == nwarmup) {
         cout << "warm up period ends!" << endl;
       }
       if (iftest == true) {
-        cout << "sigma " << svec[0] << endl;
-        bm.draw_sigmaupdate(svec,gen, nu, lambda, kappa, sigma_m, mlik);
+        //cout << "sigma " << svec[0] << endl;
+        bm.draw_sigmaupdate(svec,gen, nu, lambda, kappa, sigma_m, mlik, isexact);
         mliks[i] = mlik;
         kappas[i] = kappa;
         sigmams[i] = sigma_m;

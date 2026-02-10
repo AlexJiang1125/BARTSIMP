@@ -17,6 +17,11 @@
  *  https://www.R-project.org/Licenses/GPL-2
  */
 
+#define ARMA_USE_SUPERLU 1
+#include <RcppArmadillo.h>
+using namespace Rcpp;
+using namespace std;
+using namespace std::chrono;
 #include "heterbart.h"
 
 //--------------------------------------------------
@@ -69,8 +74,12 @@ void heterbart::initializetrees() {
 
 //--------------------------------------------------
 // with sigma updated
-double heterbart::draw_sigmaupdate(double *sigma, rn& gen, double nu, double lambda, double &kappa, double &sigma_m, double &mlik)
+double heterbart::draw_sigmaupdate(double *sigma, rn& gen, double nu, double lambda, double &kappa, double &sigma_m, double &mlik, bool isexact)
 {
+  using std::chrono::high_resolution_clock;
+  using std::chrono::duration_cast;
+  using std::chrono::duration;
+  using std::chrono::milliseconds;
   for(size_t j=0;j<m;j++) {
     fit(t[j],xi,p,n,x,ftemp);
     for(size_t k=0;k<n;k++) {
@@ -78,10 +87,31 @@ double heterbart::draw_sigmaupdate(double *sigma, rn& gen, double nu, double lam
       r[k] = y[k]-allfit[k];
     }
     // standard T
-    heterbd_test(t[j],xi,r,di,pi,sigma,nv,pv,aug,gen,sigma_m,kappa);
+    heterbd_test(t[j],xi,r,di,pi,sigma,nv,pv,aug,gen,sigma_m,kappa,isexact);
+    //hetergetmargprob_test(t[j], xi, di, r, sigma_m, pi);
+    //hetergetmargprob_testonly(t[j], xi, di, r, sigma_m, pi);
     // standard mu
     //cout << "spatvars " << sigma_m << " " << kappa << " nonspatvars " << sigma[0] << endl;
-    heterdrmu_new(t[j],xi,di,pi,sigma[0],gen,r,sigma_m, kappa);
+    //auto t1 = high_resolution_clock::now();
+
+    heterdrmu(t[j],xi,di,pi,sigma,gen);
+
+    //heterdrmu_new (t[j],xi,di,pi,sigma[0],gen,r,sigma_m, kappa);
+    //auto t2 = high_resolution_clock::now();
+    //auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    //cout << "origin: " << ms_int.count() << endl;
+    //std::ofstream MyFile("/Users/alexziyujiang/Documents/GitHub/BART_SIMP/results/results_origin_largedata.txt", MyFile.out | MyFile.app);
+    //MyFile << ms_int.count() << " ";
+    //MyFile << endl;
+    //auto t11 = high_resolution_clock::now();
+    //heterdrmu_new_approx(t[j],xi,di,pi,sigma[0],gen,r,sigma_m, kappa);
+    //auto t22 = high_resolution_clock::now();
+    //auto ms_int2 = duration_cast<milliseconds>(t22 - t11);
+    //cout << "approx: " << ms_int2.count() << endl;
+    //std::ofstream MyFile2("/Users/alexziyujiang/Documents/GitHub/BART_SIMP/results/results_approx_largedata.txt", MyFile2.out | MyFile2.app);
+    //MyFile2 << ms_int2.count() << " ";
+    //MyFile2 << endl;
+
     fit(t[j],xi,p,n,x,ftemp);
     for(size_t k=0;k<n;k++) {
       allfit[k] += ftemp[k];
@@ -89,11 +119,16 @@ double heterbart::draw_sigmaupdate(double *sigma, rn& gen, double nu, double lam
     }
   }
   double r_sigma[n];
+  Rcpp::NumericVector r_sigma_(n);
   for(size_t k=0;k<n;k++) {
     r_sigma[k] = y[k] - allfit[k];
   }
-  sigma[0] = heterbd_drawsigma(di, r_sigma, sigma[0],kappa, sigma_m, pi, nu, lambda);
-  heterbd_drawspathyperpars(di, r_sigma,sigma[0], kappa, sigma_m, pi, mlik);
+  for(size_t k=0; k<n; k++) {
+    r_sigma_[k] = r_sigma[k];
+  }
+  cout << "sd " << Rcpp::sd(r_sigma_);
+  sigma[0] = heterbd_drawsigma(di, r_sigma, sigma[0],kappa, sigma_m, pi, nu, lambda, gen, isexact);
+  heterbd_drawspathyperpars(di, r_sigma,sigma[0], kappa, sigma_m, pi, mlik, gen, isexact);
 
   //if(dartOn) {
   //  draw_s(nv,lpv,theta,gen);
@@ -174,7 +209,7 @@ int heterbart::findindex(Rcpp::IntegerVector vec, int val) {
 
 
 //--------------------------------------------------
-void heterbart::draw_test(double *sigma, rn& gen, double &kappa, double &sigma_m)
+void heterbart::draw_test(double *sigma, rn& gen, double &kappa, double &sigma_m, bool isexact)
 {
   for(size_t j=0;j<m;j++) {
     fit(t[j],xi,p,n,x,ftemp);
@@ -183,7 +218,7 @@ void heterbart::draw_test(double *sigma, rn& gen, double &kappa, double &sigma_m
       r[k] = y[k]-allfit[k];
       //cout << allfit[k] << " ";
     }
-    heterbd_test(t[j],xi,r,di,pi,sigma,nv,pv,aug,gen,sigma_m,kappa);
+    heterbd_test(t[j],xi,r,di,pi,sigma,nv,pv,aug,gen,sigma_m,kappa,isexact);
     heterdrmu(t[j],xi,di,pi,sigma,gen);
     fit(t[j],xi,p,n,x,ftemp);
     for(size_t k=0;k<n;k++) {
@@ -192,13 +227,49 @@ void heterbart::draw_test(double *sigma, rn& gen, double &kappa, double &sigma_m
   }
 }
 
+// covert to sparse matrix
+arma::sp_mat heterbart::convertSparse(Rcpp::S4 mat) {
+
+  // obtain dim, i, p. x from S4 object
+  IntegerVector dims = mat.slot("Dim");
+  arma::urowvec i = Rcpp::as<arma::urowvec>(mat.slot("i"));
+  arma::urowvec p = Rcpp::as<arma::urowvec>(mat.slot("p"));
+  arma::vec x     = Rcpp::as<arma::vec>(mat.slot("x"));
+
+  int nrow = dims[0], ncol = dims[1];
+
+  // use Armadillo sparse matrix constructor
+  arma::sp_mat res(i, p, x, nrow, ncol);
+  return res;
+  // Rcout << "SpMat res:\n" << res << std::endl;
+}
+
+
 // create mesh
 void heterbart::makemesh() {
   Environment env("package:INLA");
   Rcpp::List myList(2);
   Function inlaMesh2D = env["inla.mesh.2d"];
-  Rcpp::NumericVector edge_arg = {0.1/2.5,0.2/2.5};
-  Rcpp::NumericVector offset = {0.1/2.5,0.2/2.5};
+  // Rcpp::NumericVector edge_arg(2);
+  // edge_arg[0] = 0.04;
+  // edge_arg[1] = 0.08;
+  //
+  // Rcpp::NumericVector offset(2);
+  // offset[0] = 0.04;
+  // offset[1] = 0.08;
+
+  // Rcpp::NumericVector domainvec(8);
+  // domainvec[0] = 0.0;
+  // domainvec[1] = 1.0;
+  // domainvec[2] = 1.0;
+  // domainvec[3] = 0.0;
+  // domainvec[4] = 0.0;
+  // domainvec[5] = 0.0;
+  // domainvec[6] = 1.0;
+  // domainvec[7] = 1.0;
+
+  Rcpp::NumericVector edge_arg = {0.04, 0.08};//{0.04,0.08};
+  Rcpp::NumericVector offset = {0.04,0.08};
   Rcpp::NumericVector domainvec = {0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0};
   domainvec.attr("dim") = Rcpp::Dimension(4,2);
   Rcpp::CharacterVector namevec;
@@ -232,7 +303,10 @@ void heterbart::makemesh_bypoints() {
   double ymin = Rcpp::min(di.s2);
   double ymax = Rcpp::max(di.s2);
   double avg_lth = (ymax - ymin + xmax - xmin)*0.5;
-  Rcpp::NumericVector edge_arg = {0.1*avg_lth,0.2*avg_lth};
+  double edge_1 = 0.1*avg_lth;
+  double edge_2 = 0.2*avg_lth;
+
+  Rcpp::NumericVector edge_arg = {edge_1,edge_2};
   double cutoff = 0.05*avg_lth;
   namevec.push_back("cx");
   myList[1] = di.s2;
@@ -244,4 +318,72 @@ void heterbart::makemesh_bypoints() {
                                Rcpp::_["cutoff"] = cutoff);
   di.mesh = mesh;
   int nmesh = mesh["n"];
+  Function inlaSpdeMakeA = env["inla.spde.make.A"];
+  Rcpp::List myList_coords(2);
+  Rcpp::CharacterVector namevec_coords;
+  std::string namestem_coords = "Column Heading";
+  myList_coords[0] = di.s1;
+  namevec_coords.push_back("cx");
+  myList_coords[1] = di.s2;
+  namevec_coords.push_back("cy");
+  myList.attr("names") = namevec_coords;
+  Rcpp::DataFrame dfout_coords(myList_coords);
+  NumericMatrix coords = internal::convert_using_rfunction(dfout_coords, "as.matrix");
+  Rcpp::S4 A = inlaSpdeMakeA(
+    Rcpp::_["mesh"] = di.mesh,
+    Rcpp::_["loc"] = coords
+  );
+  di.A = Rcpp::as<arma::sp_mat>(A);
+}
+
+// create mesh, by points
+void heterbart::makemesh_bypoints_unique() {
+  Environment env("package:INLA");
+  Rcpp::List myList(2);
+  Function inlaMesh2D = env["inla.mesh.2d"];
+  Rcpp::NumericVector domainvec = {0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0};
+  domainvec.attr("dim") = Rcpp::Dimension(4,2);
+  Rcpp::CharacterVector namevec;
+  std::string namestem = "Column Heading";
+  Function unique("unique");
+  Rcpp::NumericVector it_s1 = unique(di.s1);
+  Rcpp::NumericVector it_s2 = unique(di.s2);
+
+  myList[0] = it_s1;
+  myList[1] = it_s2;
+  double xmin = Rcpp::min(di.s1);
+  double xmax = Rcpp::max(di.s1);
+  double ymin = Rcpp::min(di.s2);
+  double ymax = Rcpp::max(di.s2);
+  double avg_lth = (ymax - ymin + xmax - xmin)*0.5;
+  double edge_1 = 0.1*avg_lth;
+  double edge_2 = 0.2*avg_lth;
+
+  Rcpp::NumericVector edge_arg = {edge_1,edge_2};
+  double cutoff = 0.05*avg_lth;
+  namevec.push_back("cx");
+  namevec.push_back("cy");
+  myList.attr("names") = namevec;
+  Rcpp::DataFrame dfout(myList);
+  Rcpp::List mesh = inlaMesh2D(Rcpp::_["loc.domain"] = dfout,
+                               Rcpp::_["max.edge"] = edge_arg,
+                               Rcpp::_["cutoff"] = cutoff);
+  di.mesh = mesh;
+  int nmesh = mesh["n"];
+  Function inlaSpdeMakeA = env["inla.spde.make.A"];
+  Rcpp::List myList_coords(2);
+  Rcpp::CharacterVector namevec_coords;
+  std::string namestem_coords = "Column Heading";
+  myList_coords[0] = it_s1;
+  namevec_coords.push_back("cx");
+  myList_coords[1] = it_s2;
+  namevec_coords.push_back("cy");
+  myList.attr("names") = namevec_coords;
+  Rcpp::DataFrame dfout_coords(myList_coords);
+  NumericMatrix coords = internal::convert_using_rfunction(dfout_coords, "as.matrix");
+  Rcpp::S4 A = inlaSpdeMakeA(
+    Rcpp::_["mesh"] = di.mesh,
+    Rcpp::_["loc"] = coords
+  );
+  di.A_unique = Rcpp::as<arma::sp_mat>(A);
 }

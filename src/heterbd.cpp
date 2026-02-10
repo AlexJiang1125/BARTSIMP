@@ -153,12 +153,25 @@ bool heterbd(tree& x, xinfo& xi, dinfo& di, pinfo& pi, double *sigma,
 // for test only, gaussian case
 bool heterbd_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double *sigma,
                   std::vector<size_t>& nv, std::vector<double>& pv, bool aug, rn& gen,
-                  double &sigma_m, double &kappa)
+                  double &sigma_m, double &kappa, bool isexact)
 {
+  using std::chrono::high_resolution_clock;
+  using std::chrono::duration_cast;
+  using std::chrono::duration;
+  using std::chrono::milliseconds;
+
+
+
   tree::npv goodbots;  //nodes we could birth at (split on)
   double PBx = getpb(x,xi,pi,goodbots); //prob of a birth at x
 
-  if(gen.uniform() < PBx) { //do birth or death
+  GetRNGstate();
+  Rcpp::NumericVector guni = Rcpp::runif(1);
+  PutRNGstate();
+  // double guni = arma::randu<double>(); //gen.uniform();
+  cout << guni[0] << endl;
+
+  if(guni[0] < PBx) { //do birth or death
 
     //--------------------------------------------------
     //draw proposal
@@ -179,8 +192,35 @@ bool heterbd_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double *s
     double alpha=0.0, lalpha=0.0;
     //cout << "nl: " << nl << " " << nr << endl;
     if((nl>=5) && (nr>=5)) { //cludge?
-      double lh1 = hetergetmargprob_all(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
-      double lh2 = hetergetmargprob_all(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+
+      //auto t1 = high_resolution_clock::now();
+      //double lh1 = hetergetmargprob_all(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //auto t2 = high_resolution_clock::now();
+      //auto ms_int = duration_cast<milliseconds>(t2 - t1);
+      //cout << "INLA: " << ms_int.count() << endl;
+      double lh1, lh2;
+      if (isexact) {
+        lh1 = hetergetmargprob_exact(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+        lh2 = hetergetmargprob_exact(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      } else {
+        lh1 = hetergetmargprob_SPDEapprox(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+        lh2 = hetergetmargprob_SPDEapprox(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      }
+
+      //auto t1 = high_resolution_clock::now();
+      //double lh1_exact = hetergetmargprob_exact(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //auto t2 = high_resolution_clock::now();
+      //auto ms_int = duration_cast<milliseconds>(t2 - t1);
+      //cout << "EXACT: " << ms_int.count() << endl;
+      //t1 = high_resolution_clock::now();
+      //double lh1_approx = hetergetmargprob_SPDEapprox(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //t2 = high_resolution_clock::now();
+      //ms_int = duration_cast<milliseconds>(t2 - t1);
+      //cout << "APPROX: " << ms_int.count() << endl;
+      //double lh2 = hetergetmargprob_all(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //double lh2_exact = hetergetmargprob_exact(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //double lh2_approx = hetergetmargprob_SPDEapprox(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      //cout << " exact: " << lh1_exact - lh2_exact << " approx: " << lh1_approx - lh2_approx << endl;
       alpha=1.0;
       lalpha = log(pr) + (lh1 - lh2);
       lalpha = std::min(0.0,lalpha);
@@ -223,9 +263,23 @@ bool heterbd_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double *s
     //lht = heterlh(bl+br,Ml+Mr,pi.tau);
     //cout << "flag 1" << r[0] << ' ' << r[di.n-1] <<  endl;
     //x.printtree(xi);
-    double lh1 = hetergetmargprob_all(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    double lh1, lh2;
+    if (isexact) {
+      lh1 = hetergetmargprob_exact(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      lh2 = hetergetmargprob_exact(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    } else {
+      lh1 = hetergetmargprob_SPDEapprox(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+      lh2 = hetergetmargprob_SPDEapprox(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    }
+    // double lh1_exact = hetergetmargprob_exact(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    // double lh1_approx = hetergetmargprob_SPDEapprox(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    // double lh2_exact = hetergetmargprob_exact(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    // double lh2_approx = hetergetmargprob_SPDEapprox(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+
+    //double lh1 = hetergetmargprob_all(x, xi, di, r, sigma[0], pi, sigma_m, kappa);
     //cout << "flag 2" << endl;
-    double lh2 = hetergetmargprob_all(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    //double lh2 = hetergetmargprob_all(xold, xi, di, r, sigma[0], pi, sigma_m, kappa);
+    //cout << " exact: " << lh1_exact - lh2_exact << " approx: " << lh1_approx - lh2_approx << endl;
     double lalpha = log(pr) + (lh1 - lh2);
     lalpha = std::min(0.0,lalpha);
     //--------------------------------------------------
@@ -243,103 +297,6 @@ bool heterbd_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double *s
       return false;
     }
   }
-}
-
-
-
-// only for testing: when model is non-spatial
-double hetergetmargprob_test(
-    tree& x, xinfo& xi, dinfo& di, double* r, double sigma, pinfo& pi
-) {
-  Rcpp::NumericVector ydata;
-  for (int i = 0; i < di.n; i++) {
-    ydata.push_back(di.y[i]);
-  }
-  std::vector<size_t> idv1;
-  getbotsid(x, di.x, xi, di.n, di.p, idv1);
-  Rcpp::DataFrame df = makeC(idv1, di.n);
-  if (df.ncol() > 1) {
-    Rcpp::NumericMatrix dfmat = testDFtoNM(df);
-    arma::mat Cmat = convertC(dfmat);
-    arma::mat temp1 = Cmat.t()*Cmat;
-  }
-  //for (int i = 0; i < C_.n_cols; i++) {
-  //  cout << C_(i,i) << " ";
-  //}
-  //cout << endl;
-  std::set<int> s;
-  unsigned size = idv1.size();
-  bool flag_true = 1;
-  bool flag_false = 0;
-  for( unsigned i = 0; i < size; ++i ) s.insert( idv1[i] );
-  std::vector<size_t> idv2;
-  idv2.assign( s.begin(), s.end() );
-  Rcpp::CharacterVector cnames;
-  if (df.size() == 1) {
-    df.names() = CharacterVector({"X0"});
-    cnames = CharacterVector({"X0"});
-  } else {
-    cnames = df.names();
-  }
-  df.push_back(ydata, "y");
-  //cout << di.n << " " << di.p << endl;
-  Environment env("package:INLA");
-  Function inla = env["inla"];
-  Rcpp::List myList(2);
-  Rcpp::CharacterVector namevec;
-  std::string namestem = "Column Heading";
-  myList[0] = di.s1;
-  namevec.push_back("cx");
-  myList[1] = di.s2;
-  namevec.push_back("cy");
-  myList.attr("names") = namevec;
-  Rcpp::DataFrame dfout(myList);
-  std::string formula1 = "y ~ -1 + ";
-  for (int i = 0; i < cnames.size(); i++) {
-    formula1 += cnames[i];
-    if (i != cnames.size()-1) {
-      formula1 += " + ";
-    }
-  }
-  //cout << formula1 << endl;
-  Function form("as.formula");
-  NumericMatrix coords = internal::convert_using_rfunction(dfout, "as.matrix");
-  //double logprecstart = -log(pi.sigma2e+sigma*sigma);
-  double logprecstart = -2.0*log(sigma);
-  // Rcpp::List par_list = Rcpp::List::create(
-  //   Rcpp::Named("initial") = logprecstart,
-  //   Rcpp::Named("fixed") = flag_true,
-  //   Rcpp::Named("prior") = "loggamma",
-  //   Rcpp::Named("param") = paramvec
-  // );
-  Rcpp::List par_list = Rcpp::List::create(
-    Rcpp::Named("initial") = logprecstart,
-    Rcpp::Named("fixed") = flag_true
-  );
-  Rcpp::List prec_list = Rcpp::List::create(
-    Rcpp::Named("prec") = par_list
-  );
-  Rcpp::List hyper_list = Rcpp::List::create(
-    Rcpp::Named("hyper") = prec_list
-  );
-  Rcpp::List fixed_list = Rcpp::List::create(
-    Rcpp::Named("mean") = 0.0,
-    Rcpp::Named("prec") = 1/(pi.tau*pi.tau),
-    Rcpp::Named("mean.intercept") = 0.0,
-    Rcpp::Named("prec.intercept") = 1/(pi.tau*pi.tau)
-  );
-  Rcpp::List inla_results = inla(Rcpp::_["formula"] = form(formula1),
-                                 Rcpp::_["data"] = df,
-                                 Rcpp::_["control.family"] = hyper_list,
-                                 Rcpp::_["control.fixed"] = fixed_list,
-                                 Rcpp::_["control.compute"] = Rcpp::List::create(Named("dic") = flag_false,
-                                                                  Named("mlik") = flag_true)
-                                                                  );
-  Rcpp::NumericVector vout = inla_results["mlik"];
-  //cout << vout.length();
-  //cout << "mlik is: " << vout[0] << endl;
-  return vout[0];
-  //vout[0];
 }
 
 void printX(dinfo& di) {
@@ -449,20 +406,23 @@ double hetergetmargprob_all(
   //MyFile << "==== spat var, matern var, kappa10 ====" << endl;
   //MyFile << sigma << " " << sigma_m  << " " << kappa << endl;
 
-  Rcpp::List mesh = di.mesh;
-  int nesh = mesh["n"];
-  Function inlaSpdeMakeA = env["inla.spde.make.A"];
-  Rcpp::S4 A = inlaSpdeMakeA(
-    Rcpp::_["mesh"] = di.mesh,
-    Rcpp::_["loc"] = coords
-  );
+  // no need to generate A again!
+
+  // Rcpp::List mesh = di.mesh;
+  // int nesh = mesh["n"];
+
+  // Function inlaSpdeMakeA = env["inla.spde.make.A"];
+  // Rcpp::S4 A = inlaSpdeMakeA(
+  //   Rcpp::_["mesh"] = di.mesh,
+  //   Rcpp::_["loc"] = coords
+  // );
   //MyFile << "==== spat var, matern var, kappa11 ====" << endl;
   //MyFile << sigma << " " << sigma_m  << " " << kappa << endl;
 
   Function inlaStack = env["inla.stack"];
   Rcpp::List y_list = Rcpp::List::create(Named("y") = ydata);
   Rcpp::List A_list = Rcpp::List::create(
-    Named("A") = A,
+    Named("A") = di.A,
     Named("intercept") = 1);
   int nspde = spde["n.spde"];
   //MyFile << "nesh: " << nesh <<  "nspde: " <<  nspde << endl;
@@ -537,6 +497,100 @@ double hetergetmargprob_all(
 }
 
 
+// only for testing: when model is non-spatial
+double hetergetmargprob_test(
+    tree& x, xinfo& xi, dinfo& di, double* r, double sigma, pinfo& pi
+) {
+  Rcpp::NumericVector ydata;
+  for (int i = 0; i < di.n; i++) {
+    ydata.push_back(di.y[i]);
+  }
+  std::vector<size_t> idv1;
+  getbotsid(x, di.x, xi, di.n, di.p, idv1);
+  Rcpp::DataFrame df = makeC(idv1, di.n);
+  if (df.ncol() > 1) {
+    Rcpp::NumericMatrix dfmat = testDFtoNM(df);
+    arma::mat Cmat = convertC(dfmat);
+    arma::mat temp1 = Cmat.t()*Cmat;
+  }
+  //for (int i = 0; i < C_.n_cols; i++) {
+  //  cout << C_(i,i) << " ";
+  //}
+  //cout << endl;
+  std::set<int> s;
+  unsigned size = idv1.size();
+  bool flag_true = 1;
+  bool flag_false = 0;
+  for( unsigned i = 0; i < size; ++i ) s.insert( idv1[i] );
+  std::vector<size_t> idv2;
+  idv2.assign( s.begin(), s.end() );
+  Rcpp::CharacterVector cnames;
+  if (df.size() == 1) {
+    df.names() = CharacterVector({"X0"});
+    cnames = CharacterVector({"X0"});
+  } else {
+    cnames = df.names();
+  }
+  df.push_back(ydata, "y");
+  //cout << di.n << " " << di.p << endl;
+  Environment env("package:INLA");
+  Function inla = env["inla"];
+  Rcpp::List myList(2);
+  Rcpp::CharacterVector namevec;
+  std::string namestem = "Column Heading";
+  myList[0] = di.s1;
+  namevec.push_back("cx");
+  myList[1] = di.s2;
+  namevec.push_back("cy");
+  myList.attr("names") = namevec;
+  Rcpp::DataFrame dfout(myList);
+  std::string formula1 = "y ~ -1 + ";
+  for (int i = 0; i < cnames.size(); i++) {
+    formula1 += cnames[i];
+    if (i != cnames.size()-1) {
+      formula1 += " + ";
+    }
+  }
+  //cout << formula1 << endl;
+  Function form("as.formula");
+  NumericMatrix coords = internal::convert_using_rfunction(dfout, "as.matrix");
+  //double logprecstart = -log(pi.sigma2e+sigma*sigma);
+  double logprecstart = -2.0*log(sigma);
+  // Rcpp::List par_list = Rcpp::List::create(
+  //   Rcpp::Named("initial") = logprecstart,
+  //   Rcpp::Named("fixed") = flag_true,
+  //   Rcpp::Named("prior") = "loggamma",
+  //   Rcpp::Named("param") = paramvec
+  // );
+  Rcpp::List par_list = Rcpp::List::create(
+    Rcpp::Named("initial") = logprecstart,
+    Rcpp::Named("fixed") = flag_true
+  );
+  Rcpp::List prec_list = Rcpp::List::create(
+    Rcpp::Named("prec") = par_list
+  );
+  Rcpp::List hyper_list = Rcpp::List::create(
+    Rcpp::Named("hyper") = prec_list
+  );
+  Rcpp::List fixed_list = Rcpp::List::create(
+    Rcpp::Named("mean") = 0.0,
+    Rcpp::Named("prec") = 1/(pi.tau*pi.tau),
+    Rcpp::Named("mean.intercept") = 0.0,
+    Rcpp::Named("prec.intercept") = 1/(pi.tau*pi.tau)
+  );
+  Rcpp::List inla_results = inla(Rcpp::_["formula"] = form(formula1),
+                                 Rcpp::_["data"] = df,
+                                 Rcpp::_["control.family"] = hyper_list,
+                                 Rcpp::_["control.fixed"] = fixed_list,
+                                 Rcpp::_["control.compute"] = Rcpp::List::create(Named("dic") = flag_false,
+                                                                  Named("mlik") = flag_true)
+  );
+  Rcpp::NumericVector vout = inla_results["mlik"];
+  //cout << vout.length();
+  //cout << "mlik is: " << vout[0] << endl;
+  return vout[0];
+  //vout[0];
+}
 
 // for test only
 double hetergetmargprob_testonly(
@@ -544,11 +598,13 @@ double hetergetmargprob_testonly(
 ) {
   Rcpp::NumericVector ydata;
   for (int i = 0; i < di.n; i++) {
-    ydata.push_back(r[i]);
+    ydata.push_back(di.y[i]);
   }
   std::vector<size_t> idv1;
-  getbotsid(x, di.x, xi, di.n, di.p, idv1);
-  Rcpp::DataFrame df = makeC(idv1, di.n);
+  //printXunique(di);
+  getbotsid(x, di.xunique, xi,di.nunique , di.p, idv1);
+  Rcpp::DataFrame df = makeC(idv1, di.nunique);
+  printC(df);
   Rcpp::NumericMatrix dfmat = testDFtoNM(df);
   arma::mat Cmat = convertC(dfmat);
   arma::mat temp1 = Cmat*Cmat.t()*pi.tau*pi.tau;
@@ -562,6 +618,91 @@ double hetergetmargprob_testonly(
   return lh;
 }
 
+// a function that computes the exact marginal likelihood for T updates
+double hetergetmargprob_exact(
+    tree& x, xinfo& xi, dinfo& di, double* r, double sigma, pinfo& pi,
+    double &sigma_m, double &kappa
+) {
+  //Rcpp::NumericVector ydata;
+  //for (int i = 0; i < di.n; i++) {
+  //  ydata.push_back(r[i]);
+  //}
+  //arma::vec ydat(ydata);
+  std::vector<double> yhat_ = calcmeans(di, r);
+  arma::vec yhat(yhat_);
+  std::vector<size_t> idv1;
+  getbotsid(x, di.xunique, xi,di.nunique , di.p, idv1);
+  Rcpp::DataFrame df = makeC(idv1, di.nunique);
+  //getbotsid(x, di.x, xi,di.n , di.p, idv1);
+  //Rcpp::DataFrame df = makeC(idv1, di.n);
+  Rcpp::NumericMatrix dfmat = testDFtoNM(df);
+  arma::mat Cmat = convertC(dfmat);
+  arma::mat temp1 = Cmat*Cmat.t()*pi.tau*pi.tau;
+  arma::mat spatcov = calcMat_weighted(di, pi, sigma, sigma_m, kappa); //calcCovMat(di, pi, sigma);
+  arma::mat covs = temp1 + spatcov;
+  //cout << "determinant is " << arma::log_det_sympd(covs) << endl;
+  double lh = dmvnorm_rcpp(yhat , covs);
+  //cout << lh << endl;
+  return lh;
+}
+
+double hetergetmargprob_SPDEapprox(
+    tree& x, xinfo& xi, dinfo& di, double* r, double sigma, pinfo& pi,
+    double &sigma_m, double &kappa
+) {
+  // Rcpp::NumericVector ydata;
+  // for (int i = 0; i < di.n; i++) {
+  //   ydata.push_back(r[i]);
+  // }
+  std::vector<double> yhat_ = calcmeans(di, r);
+  arma::vec yhat(yhat_);
+  std::vector<size_t> idv1;
+  getbotsid(x, di.xunique, xi,di.nunique , di.p, idv1);
+  Rcpp::DataFrame df = makeC(idv1, di.nunique);
+  Rcpp::NumericMatrix dfmat = testDFtoNM(df);
+  arma::mat Cmat = convertC(dfmat);
+  arma::mat temp1 = Cmat*Cmat.t()*pi.tau*pi.tau;
+
+
+  // call INLA from Rcpp
+  Environment env("package:INLA");
+  // define the pcmatern model
+  Function inlaSpde2PcMatern = env["inla.spde2.pcmatern"];
+  Function inlaSpdePrecision= env["inla.spde.precision"];
+  // SPDE stuff
+  Rcpp::NumericVector priorRange = {sqrt(pi.nu*8.0)/kappa,NA_REAL};
+  Rcpp::NumericVector priorSigma = {sigma_m,NA_REAL};
+  Rcpp::List spde = inlaSpde2PcMatern(
+    Rcpp::_["mesh"] = di.mesh,
+    Rcpp::_["prior.range"] = priorRange,
+    Rcpp::_["prior.sigma"] = priorSigma
+  );
+  // Generate Q matrix
+  //Rcpp::NumericVector theta_vec = {-log(4.0*3.1415*sigma_m*sigma_m*kappa*kappa),
+  //                                 log(kappa)};
+  Rcpp::NumericVector theta_vec = {log(sqrt(pi.nu*8.0)/kappa),
+                                   log(sigma_m)};
+  Rcpp::S4 Q = inlaSpdePrecision(
+    Rcpp::_["spde"] = spde,
+    Rcpp::_["theta"] = theta_vec
+  );
+  arma::sp_mat Q_sp = Rcpp::as<arma::sp_mat>(Q);
+  arma::sp_mat A_sp = di.A_unique;
+  arma::mat mydiag(Q_sp.n_rows , Q_sp.n_cols, fill::eye);
+  arma::mat mat_1_inv = arma::spsolve(Q_sp, mydiag, "lapack");
+
+  arma::mat y_(di.nunique, di.nunique, fill::eye);
+  for (int i = 0; i < di.nunique; i++) {
+    y_(i,i) = y_(i,i)* sigma * sigma/di.dat_size[i];
+  }
+
+  arma::mat spatcov = A_sp*mat_1_inv*A_sp.t();//calcMat_weighted(di, pi, sigma, sigma_m, kappa);
+  arma::mat covs = temp1 + y_ + spatcov;
+  //cout << "determinant is " << arma::log_det_sympd(covs) << endl;
+  double lh = dmvnorm_rcpp(yhat , covs);
+  //cout << lh << endl;
+  return lh;
+}
 
 double hetergetmargprob(
     tree& x, xinfo& xi, dinfo& di, double* r, double sigma, pinfo& pi
@@ -1009,6 +1150,66 @@ bool heterbd_new_test2(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, doub
   }
 }
 
+double heterbd_drawsigma_margprob_exact(double* r, dinfo& di, pinfo& pi, double sigma, double &sigma_m, double &kappa) {
+
+  std::vector<double> yhat_ = calcmeans(di, r);
+  arma::vec yhat(yhat_);
+
+  arma::mat spatcov = calcMat_weighted(di, pi, sigma, sigma_m, kappa); //calcCovMat(di, pi, sigma);
+  arma::mat covs = spatcov;
+  //cout << "determinant is " << arma::log_det_sympd(covs) << endl;
+  double mlik_exact = dmvnorm_rcpp(yhat , covs);
+  return mlik_exact;
+}
+
+double heterbd_drawsigma_margprob_SPDEapprox(double* r, dinfo& di, pinfo& pi, double sigma, double &sigma_m, double &kappa) {
+  // spde approx method
+  std::vector<double> yhat_ = calcmeans(di, r);
+  arma::vec yhat(yhat_);
+  // call INLA from Rcpp
+  Environment env("package:INLA");
+  // define the pcmatern model
+  Function inlaSpde2PcMatern = env["inla.spde2.pcmatern"];
+  Function inlaSpdePrecision= env["inla.spde.precision"];
+  // SPDE stuff
+  Rcpp::NumericVector priorRange = {sqrt(pi.nu*8.0)/kappa,NA_REAL};
+  Rcpp::NumericVector priorSigma = {sigma_m,NA_REAL};
+  Rcpp::List spde = inlaSpde2PcMatern(
+    Rcpp::_["mesh"] = di.mesh,
+    Rcpp::_["prior.range"] = priorRange,
+    Rcpp::_["prior.sigma"] = priorSigma
+  );
+  // Generate Q matrix
+  //Rcpp::NumericVector theta_vec = {-log(4.0*3.1415*sigma_m*sigma_m*kappa*kappa),
+  //                                 log(kappa)};
+  Rcpp::NumericVector theta_vec = {log(sqrt(pi.nu*8.0)/kappa),
+                                   log(sigma_m)};
+  Rcpp::S4 Q = inlaSpdePrecision(
+    Rcpp::_["spde"] = spde,
+    Rcpp::_["theta"] = theta_vec
+  );
+  arma::sp_mat Q_sp = Rcpp::as<arma::sp_mat>(Q);
+  arma::sp_mat A_sp = di.A_unique;
+  // calculate the precision matrix using Woodbury formula
+  arma::sp_mat mydiag2(A_sp.n_rows, A_sp.n_rows);
+  for (int i = 0; i < di.nunique; i++) {
+    mydiag2(i,i) = di.dat_size[i]/ sigma / sigma;
+  }
+  arma::sp_mat mat_1 = (A_sp.t()*mydiag2*A_sp + Q_sp);
+  arma::mat mydiag(mat_1.n_rows , mat_1.n_cols, fill::eye);
+  arma::mat mat_1_inv = arma::spsolve(mat_1, mydiag, "lapack");
+  arma::mat mat_2 = mydiag2*A_sp*mat_1_inv*A_sp.t()*mydiag2;
+  arma::mat mat_temp = mydiag2 - mat_2;
+  // determinant Sigma
+  double det_Sigma = arma::log_det_sympd(mat_temp);
+  // distance
+  double dist = dmvnorm_distance(yhat, mat_temp);
+  double pi1 = 3.14159265358979;
+  double mlik_spde = - mat_temp.n_rows * std::log(2*pi1) - dist + det_Sigma;
+  mlik_spde = 0.5 * mlik_spde;
+  return mlik_spde;
+}
+
 double heterbd_drawsigma_margprob(double* r, dinfo& di, pinfo& pi, double sigma, double &sigma_m, double &kappa) {
   Rcpp::NumericVector ydata;
   //cout << "---data---" << endl;
@@ -1042,18 +1243,18 @@ double heterbd_drawsigma_margprob(double* r, dinfo& di, pinfo& pi, double sigma,
     Rcpp::_["prior.range"] = priorRange,
     Rcpp::_["prior.sigma"] = priorSigma
   );
-  Rcpp::List mesh = di.mesh;
-  int nesh = mesh["n"];
-  Function inlaSpdeMakeA = env["inla.spde.make.A"];
-  NumericMatrix coords = internal::convert_using_rfunction(dfout, "as.matrix");
-  Rcpp::S4 A = inlaSpdeMakeA(
-    Rcpp::_["mesh"] = di.mesh,
-    Rcpp::_["loc"] = coords
-  );
+  //Rcpp::List mesh = di.mesh;
+  //int nesh = mesh["n"];
+  // Function inlaSpdeMakeA = env["inla.spde.make.A"];
+  // NumericMatrix coords = internal::convert_using_rfunction(dfout, "as.matrix");
+  // Rcpp::S4 A = inlaSpdeMakeA(
+  //   Rcpp::_["mesh"] = di.mesh,
+  //   Rcpp::_["loc"] = coords
+  // );
   Function inlaStack = env["inla.stack"];
   Rcpp::List y_list = Rcpp::List::create(Named("y") = ydata);
   Rcpp::List A_list = Rcpp::List::create(
-    Named("A") = A,
+    Named("A") = di.A,
     Named("intercept") = 1);
   int nspde = spde["n.spde"];
   //cout << nspde << endl;
@@ -1091,7 +1292,7 @@ double heterbd_drawsigma_margprob(double* r, dinfo& di, pinfo& pi, double sigma,
                                  //Rcpp::_["scale"] = di.dat_size,
                                  Rcpp::_["control.family"] = hyper_list,
                                  Rcpp::_["num.threads"] = "1:1",
-                                 Rcpp::_["only.hyperparam"] = flag_true,
+                                 //Rcpp::_["only.hyperparam"] = flag_true,
                                  Rcpp::_["control.compute"] = Rcpp::List::create(Named("dic") = flag_false,
                                                                   Named("mlik") = flag_true),
                                                                   Rcpp::_["data"] = inlaStackData(stkDat, Rcpp::_["spde"] = spde),
@@ -1162,36 +1363,50 @@ double heterbd_drawsigma_margprob_test(double* r, dinfo& di, pinfo& pi, double s
 
 
 double heterbd_drawsigma(
-    dinfo& di, double* r, double sigma,double &kappa,double &sigma_m, pinfo& pi, double lambda, double nu
+    dinfo& di, double* r, double sigma,double &kappa,double &sigma_m, pinfo& pi, double lambda, double nu, rn& gen, bool isexact
 ) {
-  arma::arma_rng::set_seed(1);
   // proposing
   // check if this is doing what we intended
+  // arma::arma_rng::set_seed_random();
   double omi = 0.08; // propose parameter for MH draws
-  double rands = arma::randn<double>();
+  GetRNGstate();
+  Rcpp::NumericVector gn1 = Rcpp::rnorm(1);
+  PutRNGstate();
+  double rands = gn1[0];//arma::randn<double>();
+  //cout << "var " << rands << endl;
   double temp = rands*omi+(2.0)*std::log(sigma);
   double sigma_star = std::sqrt(std::exp(temp));
-  //double sigma_star = rands*omi + sigma;
-  //if (sigma_star < 0) {
-  //  return sigma;
-  //} else {
   //cout << "sigma, sigmam, kappa: " << sigma_star << " " << sigma_m << " " << kappa << endl;
-  double mlik1 = heterbd_drawsigma_margprob(r, di, pi, sigma_star, sigma_m, kappa);
+  double mlik1, mlik2;
+  if (isexact) {
+    mlik1 = heterbd_drawsigma_margprob_exact(r, di, pi, sigma_star, sigma_m, kappa);
+    mlik2 = heterbd_drawsigma_margprob_exact(r, di, pi, sigma, sigma_m, kappa);
+  } else {
+    mlik1 = heterbd_drawsigma_margprob_SPDEapprox(r, di, pi, sigma_star, sigma_m, kappa);
+    mlik2 = heterbd_drawsigma_margprob_SPDEapprox(r, di, pi, sigma, sigma_m, kappa);
+  }
   //cout << "sigma, sigmam, kappa: " << sigma << " " << sigma_m << " " << kappa << endl;
-  double mlik2 = heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_m, kappa);
+  //double mlik2 = 0;//heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_m, kappa);
   bool flag_true = 1;
-  //cout << lambda << "lambda" << nu << "nu" << endl;
+  cout << lambda << "lambda" << nu << "nu" << endl;
   double p1 = R::dchisq(nu*lambda/sigma_star/sigma_star,nu,flag_true);
-  //cout << p1 << "p1" << endl;
+  cout << p1 << "p1" << endl;
   double p2 = R::dchisq(nu*lambda/sigma/sigma,nu,flag_true);
   double pdiff = -nu*lambda/(2.0)*(1/sigma_star/sigma_star - 1/sigma/sigma) + (1.0 + nu/2.0)*(std::log(sigma) - std::log(sigma_star))*(2.0);
   double pdiff2 = (p1 - p2) + (std::log(sigma) - std::log(sigma_star))*(4.0);
-  //cout << pdiff << " " << pdiff2 << endl;
-  //cout << p1 << " " <<  nu*lambda/sigma_star/sigma_star << " " << nu << endl;
-  //cout << sigma_star-sigma << " sigma " <<  mlik1- mlik2 << " mlik " << endl;
-  double mh_ratio = mlik1 - mlik2 + (p1 - p2) + (std::log(sigma_star) - std::log(sigma))*(2.0);
+  cout << pdiff << " " << pdiff2 << endl;
+  cout << p1 << " " <<  nu*lambda/sigma_star/sigma_star << " " << nu << endl;
+  cout << sigma_star-sigma << " sigma " <<  mlik1- mlik2 << " mlik " << endl;
+  double mh_ratio;
+  if (isexact) {
+    mh_ratio = mlik1 - mlik2;// + (p1 - p2) + (std::log(sigma_star) - std::log(sigma))*(2.0);
+  } else {
+    mh_ratio = mlik1 - mlik2;// + (p1 - p2) + (std::log(sigma_star) - std::log(sigma))*(2.0);
+  }
   //double mh_ratio = std::min(0.0, mlik1 - mlik2  -(p1 - p2));
   //cout << mh_ratio << " " << sigma_star << " " << sigma << endl;
+  //cout << "m1" << mlik1 << " m2 " << mlik2 << endl;
+  //cout << "sig: INLA: " << mlik1 - mlik2 <<  " exact: " << mlik1_exact - mlik2_exact << " approx: " << mlik1_approx - mlik2_approx << endl;
   if (mh_ratio > 0) {
     return sigma_star;
    } else {
@@ -1206,21 +1421,33 @@ double heterbd_drawsigma(
 }
 
 void heterbd_drawspathyperpars(
-    dinfo& di, double* r, double sigma, double &kappa, double &sigma_m, pinfo& pi, double &mlik) {
-  arma::arma_rng::set_seed(1);
+    dinfo& di, double* r, double sigma, double &kappa, double &sigma_m, pinfo& pi, double &mlik, rn& gen, bool isexact) {
+  // arma::arma_rng::set_seed_random();
   // proposing
   // check if this is doing what we intended
   double omi = 0.08; // propose parameter for MH draws
-  double rands = arma::randn<double>();
-  double rands2 = arma::randn<double>();
+  GetRNGstate();
+  Rcpp::NumericVector gn1 = Rcpp::rnorm(2);
+  PutRNGstate();
+  double rands = gn1[0];
+  double rands2 = gn1[1];
+  //cout << "hpp " << rands << " " << rands2 << endl;
   double temp_kappa = rands*omi+std::log(kappa);
   double temp_sigma_m = rands2*omi+std::log(sigma_m);
   double sigma_mstar = std::exp(temp_sigma_m);
   double kappa_star = std::exp(temp_kappa);
   //cout << "sigma, sigmam, kappa: " << sigma << " " << sigma_mstar << " " << kappa_star << endl;
-  double mlik1 = heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_mstar, kappa_star);
-  //cout << "sigma, sigmam, kappa: " << sigma << " " << sigma_m << " " << kappa << endl;
-  double mlik2 = heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_m, kappa);
+  double mlik1, mlik2;
+  // double mlik1 = 0;//heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_mstar, kappa_star);
+  if (isexact) {
+    mlik1 = heterbd_drawsigma_margprob_exact(r, di, pi, sigma, sigma_mstar, kappa_star);
+    mlik2 = heterbd_drawsigma_margprob_exact(r, di, pi, sigma, sigma_m, kappa);
+  } else {
+    mlik1 = heterbd_drawsigma_margprob_SPDEapprox(r, di, pi, sigma, sigma_mstar, kappa_star);
+    mlik2 = heterbd_drawsigma_margprob_SPDEapprox(r, di, pi, sigma, sigma_m, kappa);
+  }
+  //cout << "m1" << mlik1 << " m2 " << mlik2 << endl;
+  //cout << "hyp: INLA: " << mlik1 - mlik2 <<  " exact: " << mlik1_exact - mlik2_exact << " approx: " << mlik1_approx - mlik2_approx << endl;
   //cout << mlik2;
   // pc prior difference
   //cout << pi.sigma_m0 << " " << pi.alpha_2 << endl;
@@ -1473,6 +1700,7 @@ double dmvnorm_rcpp( arma::vec y, arma::mat Sigma ) {
 
 
   // inverse Sigma
+  // cout << "sigma1" << endl;
   arma::mat Sigma1 = arma::inv_sympd(Sigma);
   // determinant Sigma
   double det_Sigma = arma::log_det_sympd(Sigma);

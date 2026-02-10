@@ -20,6 +20,8 @@
 #ifndef GUARD_info_h
 #define GUARD_info_h
 #include "common.h"
+#include <RcppArmadillo.h>
+using namespace Rcpp;
 //data
 class dinfo {
 public:
@@ -34,6 +36,8 @@ public:
   Rcpp::NumericVector s2; // y coordinate
   Rcpp::NumericVector dat_size;
   Rcpp::List mesh; // the mesh object
+  arma::sp_mat A; // the projection matrix corresponding to the mesh
+  arma::sp_mat A_unique; // the projection matrix corresponding to the mesh
 };
 //prior and mcmc
 class pinfo

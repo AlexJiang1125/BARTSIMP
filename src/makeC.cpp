@@ -1,6 +1,7 @@
 //#include <Rcpp.h>
 //using namespace Rcpp;
 
+//#define ARMA_USE_SUPERLU 1
 
 #include "makeC.h"
 #include "treefuns.h"

@@ -36,8 +36,12 @@ mywbart=function(
   nkeeptrain=ndpost, nkeeptest=ndpost,
   nkeeptestmean=ndpost, nkeeptreedraws=ndpost,
   printevery=100L, transposed=FALSE,
-  seed = 99L, iftest, nwarmup=0,
-  usecoords = TRUE
+  seed = 99L, iftest, isexact=FALSE, nwarmup=0,
+  usecoords = TRUE,
+  sigest_new = 1, range_new = 5, sig_m_new = 1,
+  rho_0 = 2.4, sigmam_0 = 0.55,
+  alpha_1 = 0.05, alpha_2 = 0.05,
+  doBART = FALSE
 )
 {
   #--------------------------------------------------
@@ -127,11 +131,13 @@ mywbart=function(
   #                 y_train = y.train,
   #                 s1 = s1,
   #                 s2 = s2)
-  sigest_new <- 1.1#hyperpar$sigest_new
-  range_new <- 0.5#hyperpar$range_new
-  sig_m_new <- 0.55#hyperpar$sig_m_new
-  rho_0 <- 2.4#hyperpar$rho_0
-  sigmam_0 <- 0.55#hyperpar$sigmam_0
+  sigest_new <- sigest_new#1.1#hyperpar$sigest_new
+  range_new <- range_new#hyperpar$range_new
+  sig_m_new <- sig_m_new#hyperpar$sig_m_new
+  rho_0 <- rho_0#2.4#hyperpar$rho_0
+  sigmam_0 <- sigmam_0#0.55#hyperpar$sigmam_0
+  alpha_1 <- alpha_1
+  alpha_2 <- alpha_2
   # dist_vec <- as.vector(dist(s_mat))
   # rho_0 <- quantile(dist_vec, 0.5)/2.5
   # sigmam_0 <- sigest * 2.5
@@ -141,7 +147,7 @@ mywbart=function(
 
   #--- set unique
   x.unique <- x.train[,cumsum(size)]
-  print(dim(x.unique))
+  #print(dim(x.unique))
   n.unique <- length(size)
 
   #--- check if we need to load from a previous tree object
@@ -183,6 +189,8 @@ mywbart=function(
               sigest_new,
               rho_0,
               sigmam_0,
+              alpha_1,
+              alpha_2,
               range_new,
               sig_m_new,
               sigest_new,
@@ -202,10 +210,12 @@ mywbart=function(
               printevery,
               xinfo,
               iftest,
+              isexact,
               nwarmup,
               usecoords,
               tree.update,
-              treeprev_last
+              treeprev_last,
+              doBART
   )
 
   res$proc.time <- proc.time()-ptm
