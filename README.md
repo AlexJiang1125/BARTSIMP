@@ -1,6 +1,22 @@
-## Installation
+## Installation and requirements
 
-You can install the development version of **BARTSIMP** from GitHub:
+This package depends on the following R packages:
+
+- **INLA** (for spatial modeling and mesh construction)
+- **Rcpp** and **RcppArmadillo** (for compiled code support)
+
+Because **INLA** is not available on CRAN, install it first:
+
+```r
+install.packages(
+  "INLA",
+  repos = c(getOption("repos"),
+            INLA = "https://inla.r-inla-download.org/R/stable"),
+  dep = TRUE
+)
+```
+
+Then install **BARTSIMP** from GitHub:
 
 ```r
 install.packages("remotes")
