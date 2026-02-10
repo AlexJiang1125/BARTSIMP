@@ -1,3 +1,13 @@
+## Installation
+
+You can install the development version of **BARTSIMP** from GitHub:
+
+```r
+install.packages("remotes")
+remotes::install_github("AlexJiang1125/BARTSIMP")
+```
+
+
 ## Example
 
 Below is a minimal example using the included toy dataset.
