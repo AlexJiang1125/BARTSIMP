@@ -86,14 +86,14 @@ void tree::pr(bool pc)
 
   std::string pad(2*d,' ');
   std::string sp(", ");
-  if(pc && (ntype()=='t'))
-    cout << "tree size: " << treesize() << std::endl;
-  cout << pad << "(id,parent): " << id << sp << pid;
-  cout << sp << "(v,c): " << v << sp << c;
-  cout << sp << "theta: " << theta;
-  cout << sp << "type: " << ntype();
-  cout << sp << "depth: " << depth();
-  cout << sp << "pointer: " << this << std::endl;
+  //if(pc && (ntype()=='t'))
+    //cout << "tree size: " << treesize() << std::endl;
+  //cout << pad << "(id,parent): " << id << sp << pid;
+  //cout << sp << "(v,c): " << v << sp << c;
+  //cout << sp << "theta: " << theta;
+  //cout << sp << "type: " << ntype();
+  //cout << sp << "depth: " << depth();
+  //cout << sp << "pointer: " << this << std::endl;
   if(pc) {
     if(l) {
       l->pr(pc);
@@ -364,13 +364,13 @@ void tree::printtree(xinfo& xi)
 {
   tree::cnpv nds;
   this->getnodes(nds);
-  cout << nds.size() << std::endl;
+  //cout << nds.size() << std::endl;
   for(size_t i=0;i<nds.size();i++) {
-    cout << nds[i]->nid() << " ";
-    cout << nds[i]->getv() << " ";
-    cout << nds[i]->getc() << " ";
-    cout << xi[nds[i]->getv()][nds[i]->getc()] << " ";
-    cout << nds[i]->gettheta() << endl;
+    //cout << nds[i]->nid() << " ";
+    //cout << nds[i]->getv() << " ";
+    //cout << nds[i]->getc() << " ";
+    //cout << xi[nds[i]->getv()][nds[i]->getc()] << " ";
+    //cout << nds[i]->gettheta() << endl;
   }
   return;
 }

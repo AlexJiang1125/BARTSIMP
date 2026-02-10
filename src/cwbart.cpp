@@ -1,20 +1,4 @@
 /*
- *  BART: Bayesian Additive Regression Trees
- *  Copyright (C) 2017 Robert McCulloch and Rodney Sparapani
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, a copy is available at
- *  https://www.R-project.org/Licenses/GPL-2
  */
 
 #include "tree.h"
@@ -343,15 +327,15 @@ RcppExport SEXP cwbart(
     bm.setdart(a,b,rho,aug,dart,theta,omega);
     //cout << "usecoords" << usecoords;
     if (usecoords) {
-      cout << "usecoords" << endl;
+      //cout << "usecoords" << endl;
       bm.makemesh_bypoints();
-      cout << "usecoords1" << endl;
+      //cout << "usecoords1" << endl;
       bm.makemesh_bypoints_unique();
     } else {
       //cout << "notusecoords" << endl;
       bm.makemesh();
     }
-    cout << "usecoords2" << endl;
+    //cout << "usecoords2" << endl;
 
 
     //--------------------------------------------------
@@ -395,7 +379,7 @@ RcppExport SEXP cwbart(
 
     //--------------------------------------------------
     //mcmc
-    printf("\nMCMC\n");
+    //printf("\nMCMC\n");
     //size_t index;
     size_t trcnt=0; //count kept train draws
     size_t tecnt=0; //count kept test draws
@@ -419,7 +403,7 @@ RcppExport SEXP cwbart(
     //cout << (iftest) << endl;
 
     for(size_t i=0;i<(nd+nwarmup+burn);i++) {
-      if(i%printevery==0) printf("done %zu (out of %lu)\n",i,nd+burn);
+      //if(i%printevery==0) printf("done %zu (out of %lu)\n",i,nd+burn);
       if(i==(burn/2)&&dart) bm.startdart();
       // draw bart
       if(i< nwarmup) {
@@ -432,7 +416,7 @@ RcppExport SEXP cwbart(
         }
       }
       if (i == nwarmup) {
-        cout << "warm up period ends!" << endl;
+        //cout << "warm up period ends!" << endl;
       }
       if (iftest == true) {
         //cout << "sigma " << svec[0] << endl;
@@ -505,7 +489,7 @@ RcppExport SEXP cwbart(
         //cout << iy[0]-bm.f(0) << "true residual" << endl;
       }
       rss=0.0;
-      cout << "startprint" << endl;
+      //cout << "startprint" << endl;
       if(i>=burn+nwarmup) {
         //size_t* bnds = bm.getLeafNodes();
         //for (size_t k=0;k<p;k++) {
@@ -518,7 +502,7 @@ RcppExport SEXP cwbart(
         if(nkeeptrain && (((i-(burn+nwarmup)+1) % skiptr) ==0)) {
           //index = trcnt*n;;
           //for(size_t k=0;k<n;k++) trdraw[index+k]=bm.f(k);
-          cout << "trcnt" << trcnt << endl;
+          //cout << "trcnt" << trcnt << endl;
           for(size_t k=0;k<n;k++) TRDRAW(trcnt,k)=bm.f(k);
           trcnt+=1;
         }
@@ -570,7 +554,7 @@ RcppExport SEXP cwbart(
           treedrawscnt +=1;
         }
       }
-      cout << "endprint" << endl;
+      //cout << "endprint" << endl;
     }
     int time2 = time(&tp);
     printf("time: %ds\n",time2-time1);

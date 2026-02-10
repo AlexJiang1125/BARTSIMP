@@ -1,20 +1,4 @@
 /*
- *  BART: Bayesian Additive Regression Trees
- *  Copyright (C) 2017 Robert McCulloch and Rodney Sparapani
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, a copy is available at
- *  https://www.R-project.org/Licenses/GPL-2
  */
 
 
@@ -169,7 +153,7 @@ bool heterbd_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double *s
   Rcpp::NumericVector guni = Rcpp::runif(1);
   PutRNGstate();
   // double guni = arma::randu<double>(); //gen.uniform();
-  cout << guni[0] << endl;
+  //cout << guni[0] << endl;
 
   if(guni[0] < PBx) { //do birth or death
 
@@ -304,13 +288,13 @@ void printX(dinfo& di) {
   std::ofstream MyFile("/Users/alexziyujiang/Documents/data/SBART/results.txt", MyFile.out | MyFile.app);
   for (int i = 0; i < di.n; i++) {
     for (int j = 0; j < di.p; j++) {
-      MyFile << *(x + di.p*i+j) << " ";
+      //MyFile << *(x + di.p*i+j) << " ";
     }
-    MyFile << endl;
+    //MyFile << endl;
   }
-  MyFile << "==== spat coords ====" << endl;
+  //MyFile << "==== spat coords ====" << endl;
   for (int i = 0; i < di.n; i++) {
-    MyFile << di.s1[i] << " " << di.s2[i] << endl;
+    //MyFile << di.s1[i] << " " << di.s2[i] << endl;
   }
   MyFile.close();
 }
@@ -748,7 +732,7 @@ double hetergetmargprob(
     formula1 += " + ";
   }
   formula1 += "f(i, model = spde)";
-  cout << formula1 << endl;
+  //cout << formula1 << endl;
   Function form("as.formula");
   /*
   Function inlaMesh2D = env["inla.mesh.2d"];
@@ -824,7 +808,7 @@ double hetergetmargprob(
                                Rcpp::_["control.predictor"] = controlpred_list);
   Rcpp::NumericVector vout = inla_results["mlik"];
   //cout << vout.length();
-  cout << "mlik is: " << vout[0] << endl;
+  //cout << "mlik is: " << vout[0] << endl;
   return vout[0];
   //vout[0];
 }
@@ -839,7 +823,7 @@ bool heterbd_new(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double sig
   if(gen.uniform() < PBx) { //do birth or death
     //--------------------------------------------------
     //draw proposal
-    cout << "birth" << endl;
+    //cout << "birth" << endl;
     tree::tree_p nx; //bottom node
     size_t v,c; //variable and cutpoint
     double pr; //part of metropolis ratio from proposal and prior
@@ -847,23 +831,23 @@ bool heterbd_new(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double sig
     bprop(x,xi,pi,goodbots,PBx,nx,v,c,pr,nv,pv,aug,gen);
     size_t nr,nl; //counts in proposed bots
     countbotnodes(x, nx, v, c, xi, di, nl, nr);
-    cout << "new tree"<< endl;
+    //cout << "new tree"<< endl;
     x.birthp(nx,v,c,0,0);
-    x.printtree(xi);
-    cout << "old tree"<< endl;
-    xold.printtree(xi);
+    //x.printtree(xi);
+    //cout << "old tree"<< endl;
+    //xold.printtree(xi);
     //--------------------------------------------------
     //compute sufficient statistics
     //--------------------------------------------------
     //compute alpha
     double alpha=0.0, lalpha=0.0;
-    cout << nl << " " << nr << endl;
+    //cout << nl << " " << nr << endl;
     if((nl>=5) && (nr>=5)) { //cludge?
       double lh1, lh2;
       lh1 = hetergetmargprob(x, xi, di, r, sigma, pi);
-      cout << "flag 1 " << endl;
+      //cout << "flag 1 " << endl;
       lh2 = hetergetmargprob(xold, xi, di, r, sigma, pi);
-      cout << "flag 2 " << endl;
+      //cout << "flag 2 " << endl;
 
       alpha=1.0;
       lalpha = log(pr) + (lh1-lh2);
@@ -875,21 +859,21 @@ bool heterbd_new(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double sig
     double uu = gen.uniform();
     bool dostep = (alpha > 0) && (log(uu) < lalpha);
     if(dostep) {
-      cout << "new tree" << endl;
+      //cout << "new tree" << endl;
       nv[v]++;
-      cout << "final tree"<< endl;
+      //cout << "final tree"<< endl;
       x.printtree(xi);
       return true;
     } else {
       x = xold;
-      cout << "final tree"<< endl;
+      //cout << "final tree"<< endl;
       x.printtree(xi);
       return false;
     }
   } else {
     //--------------------------------------------------
     //draw proposal
-    cout << "death" << endl;
+    //cout << "death" << endl;
     double pr;  //part of metropolis ratio from proposal and prior
     tree::tree_p nx; //nog node to death at
     tree xold = x;
@@ -905,7 +889,7 @@ bool heterbd_new(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, double sig
     //--------------------------------------------------
     //try metrop
     if(log(gen.uniform()) < lalpha) {
-      cout << "new tree" << endl;
+      //cout << "new tree" << endl;
       nv[nx->getv()]--;
       return true;
     } else {
@@ -954,9 +938,9 @@ bool heterbd_new_test(tree& x, xinfo& xi, double* r, dinfo& di, pinfo& pi, doubl
     if((nl>=5) && (nr>=5)) { //cludge?
       double lh1, lh2, lhl, lhr, lht;
       lh1 = hetergetmargprob_test(x, xi, di, r, sigma, pi);
-      cout << "flag1" << endl;
+      //cout << "flag1" << endl;
       lh2 = hetergetmargprob_test(xold, xi, di, r, sigma, pi);
-      cout << "flag2" << endl;
+      //cout << "flag2" << endl;
       //lhl = heterlh(bl,Ml,pi.tau);
       //lhr = heterlh(br,Mr,pi.tau);
       //lht = heterlh(bl+br,Ml+Mr,pi.tau);
@@ -1388,15 +1372,15 @@ double heterbd_drawsigma(
   //cout << "sigma, sigmam, kappa: " << sigma << " " << sigma_m << " " << kappa << endl;
   //double mlik2 = 0;//heterbd_drawsigma_margprob(r, di, pi, sigma, sigma_m, kappa);
   bool flag_true = 1;
-  cout << lambda << "lambda" << nu << "nu" << endl;
+  //cout << lambda << "lambda" << nu << "nu" << endl;
   double p1 = R::dchisq(nu*lambda/sigma_star/sigma_star,nu,flag_true);
-  cout << p1 << "p1" << endl;
+  //cout << p1 << "p1" << endl;
   double p2 = R::dchisq(nu*lambda/sigma/sigma,nu,flag_true);
   double pdiff = -nu*lambda/(2.0)*(1/sigma_star/sigma_star - 1/sigma/sigma) + (1.0 + nu/2.0)*(std::log(sigma) - std::log(sigma_star))*(2.0);
   double pdiff2 = (p1 - p2) + (std::log(sigma) - std::log(sigma_star))*(4.0);
-  cout << pdiff << " " << pdiff2 << endl;
-  cout << p1 << " " <<  nu*lambda/sigma_star/sigma_star << " " << nu << endl;
-  cout << sigma_star-sigma << " sigma " <<  mlik1- mlik2 << " mlik " << endl;
+  //cout << pdiff << " " << pdiff2 << endl;
+  //cout << p1 << " " <<  nu*lambda/sigma_star/sigma_star << " " << nu << endl;
+  //cout << sigma_star-sigma << " sigma " <<  mlik1- mlik2 << " mlik " << endl;
   double mh_ratio;
   if (isexact) {
     mh_ratio = mlik1 - mlik2;// + (p1 - p2) + (std::log(sigma_star) - std::log(sigma))*(2.0);
@@ -1601,8 +1585,8 @@ double mlikcalcweighted (double* r, dinfo& di, pinfo& pi, double sigma, double &
                                                                   Rcpp::_["data"] = iData,
                                                                   Rcpp::_["control.predictor"] = controlpred_list);
   Rcpp::NumericVector vout = inla_results["mlik"];
-  cout << sigma << " " << sigma_m << " " << kappa << endl;
-  cout << vout[0] << endl;
+  //cout << sigma << " " << sigma_m << " " << kappa << endl;
+  //cout << vout[0] << endl;
   //Rcpp::DataFrame Ydf = asdf(Yalg);
   //return 0;
   return vout[0];

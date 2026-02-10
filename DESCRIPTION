@@ -7,14 +7,18 @@ Authors@R:
            role = c("aut", "cre"),
            email = "jiang14@uw.edu",
            comment = c(ORCID = "0009-0002-7733-2612"))
-Description: BART for Spatial INLA Modeling and Prediction.
+Description: BART for Spatial INLA Modeling and Prediction. The package structure and interface are inspired by the BART R package.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Depends: INLA
+Depends: 
+    INLA,
+    R (>= 2.10)
 LinkingTo: 
     Rcpp, RcppArmadillo
 Imports: 
     Rcpp
+Suggests:
+    BART

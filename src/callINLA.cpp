@@ -95,7 +95,7 @@ RcppExport SEXP mySPDE(Rcpp::NumericVector s1,
                                  Rcpp::_["data"] = inlaStackData(stkDat, Rcpp::_["spde"] = spde),
                                  Rcpp::_["control.predictor"] = controlpred_list);
   Rcpp::NumericVector v = inla_results["mlik"]; //storing the vector of mliks
-  Rcout << v[0] << std::endl;
+  //Rcout << v[0] << std::endl;
   Function maternmat("matern.mat");
   Rcpp::NumericMatrix mat = maternmat(Rcpp::_["nu"] = 1,
                                       Rcpp::_["kappa"] = 1,

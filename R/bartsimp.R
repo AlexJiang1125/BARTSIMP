@@ -1,23 +1,10 @@
-
-## BART: Bayesian Additive Regression Trees
-## Copyright (C) 2017 Robert McCulloch and Rodney Sparapani
-
-## This program is free software; you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation; either version 2 of the License, or
-## (at your option) any later version.
-
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, a copy is available at
-## https://www.R-project.org/Licenses/GPL-2
-
+#' @references
+#' Chipman, H., George, E., McCulloch, R. (2010).
+#' BART: Bayesian Additive Regression Trees.
+#'
+#' The interface design is inspired by the BART R package.
 #' @export
-mywbart=function(
+bartsimp=function(
   x.train, y.train,s1,s2, x.test=matrix(0.0,0,0),
   size = rep(1,length(s1)),
   weighted = FALSE,
@@ -25,7 +12,7 @@ mywbart=function(
   a=0.5, b=1, augment=FALSE, rho=NULL,
   xinfo=matrix(0.0,0,0), usequants=FALSE,
   cont=FALSE, rm.const=TRUE,
-  sigest=NA, sigdf=3, sigquant=.90,
+  sigest=0.1, sigdf=3, sigquant=.90,
   k=2.0, power=2.0, base=.95,
   sigmaf=NA, lambda=NA,
   treeprev = NA,
@@ -36,7 +23,7 @@ mywbart=function(
   nkeeptrain=ndpost, nkeeptest=ndpost,
   nkeeptestmean=ndpost, nkeeptreedraws=ndpost,
   printevery=100L, transposed=FALSE,
-  seed = 99L, iftest, isexact=FALSE, nwarmup=0,
+  seed = 99L, iftest=FALSE, isexact=FALSE, nwarmup=500,
   usecoords = TRUE,
   sigest_new = 1, range_new = 5, sig_m_new = 1,
   rho_0 = 2.4, sigmam_0 = 0.55,
@@ -48,7 +35,7 @@ mywbart=function(
   #data
   colvars <- colnames(x.train)
   n = length(y.train)
-  print(numcut)
+  #print(numcut)
   set.seed(seed)
 
   if(!transposed) {
@@ -164,59 +151,32 @@ mywbart=function(
   #--------------------------------------------------
   ptm <- proc.time()
   #call
-  res = .Call("cwbart",
-              n,  #number of observations in training data
-              p,  #dimension of x
-              n.unique,
-              np, #number of observations in test data
-              x.train,   #pxn training data x
-              x.unique, # training unique
-              y.train,   #pxn training data x
-              x.test,   #p*np test data x
-              s1,
-              s2,
-              weighted, # if we are using the weights
-              size,
-              ntree,
-              numcut,
-              ndpost*keepevery,
-              nskip,
-              power,
-              base,
-              tau,
-              nu,
-              lambda,
-              sigest_new,
-              rho_0,
-              sigmam_0,
-              alpha_1,
-              alpha_2,
-              range_new,
-              sig_m_new,
-              sigest_new,
-              w,
-              sparse,
-              theta,
-              omega,
-              grp,
-              a,
-              b,
-              rho,
-              augment,
-              nkeeptrain,
-              nkeeptest,
-              nkeeptestmean,
-              nkeeptreedraws,
-              printevery,
-              xinfo,
-              iftest,
-              isexact,
-              nwarmup,
-              usecoords,
-              tree.update,
-              treeprev_last,
-              doBART
+  res <- invisible(
+    capture.output({
+      tmp <- .Call("cwbart",
+                   n, p, n.unique, np,
+                   x.train, x.unique, y.train, x.test,
+                   s1, s2, weighted, size,
+                   ntree, numcut,
+                   ndpost*keepevery, nskip,
+                   power, base, tau, nu, lambda,
+                   sigest_new, rho_0, sigmam_0,
+                   alpha_1, alpha_2,
+                   range_new, sig_m_new, sigest_new,
+                   w, sparse, theta, omega, grp,
+                   a, b, rho, augment,
+                   nkeeptrain, nkeeptest, nkeeptestmean,
+                   nkeeptreedraws, printevery,
+                   xinfo, iftest, isexact, nwarmup,
+                   usecoords, tree.update, treeprev_last,
+                   doBART
+      )
+    })
   )
+
+  res <- tmp
+
+
 
   res$proc.time <- proc.time()-ptm
 
@@ -233,6 +193,20 @@ mywbart=function(
   res$varcount.mean <- apply(res$varcount, 2, mean)
   res$varprob.mean <- apply(res$varprob, 2, mean)
   res$rm.const <- rm.const
+
+  res$sigmams <- res$sigmams[(nwarmup+1):(nwarmup+ndpost)]
+  res$kappas <- res$kappas[(nwarmup+1):(nwarmup+ndpost)]
+  res$sigma <- res$sigma[(nwarmup+1):(nwarmup+ndpost)]
+
   attr(res, 'class') <- 'wbart'
   return(res)
+}
+
+
+# Backward-compatibility wrapper
+#' @rdname wbart_spatial
+#' @export
+mywbart <- function(...) {
+  .Deprecated("bartsimp")
+  bartsimp(...)
 }

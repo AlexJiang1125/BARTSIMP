@@ -1,20 +1,4 @@
 /*
- *  BART: Bayesian Additive Regression Trees
- *  Copyright (C) 2017 Robert McCulloch and Rodney Sparapani
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, a copy is available at
- *  https://www.R-project.org/Licenses/GPL-2
  */
 
 //#define ARMA_USE_SUPERLU
@@ -279,9 +263,9 @@ void printXunique(dinfo& di) {
   std::ofstream MyFile("/Users/alexziyujiang/Documents/data/SBART/results.txt", MyFile.out | MyFile.app);
   for (int i = 0; i < di.nunique; i++) {
     for (int j = 0; j < di.p; j++) {
-      MyFile << *(x + di.p*i+j) << " ";
+      //MyFile << *(x + di.p*i+j) << " ";
     }
-    MyFile << endl;
+    //MyFile << endl;
   }
   MyFile.close();
 }
@@ -342,11 +326,11 @@ void heterdrmu_new(tree& t, xinfo& xi, dinfo& di, pinfo& pi, double sigma,
   for (int i = 0; i < tempz.size(); i++) {
     tempz(i) = gmu[i];
   }
-  MyFile << "==== tempz ====" << endl;
+  //MyFile << "==== tempz ====" << endl;
   for (int i = 0; i < tempz.size(); i++) {
     MyFile << tempz(i) << " ";
   }
-  MyFile << endl;
+  //MyFile << endl;
   arma::vec mudraws = meanvec + L*tempz;
   //MyFile << "==== mudraws ====" << endl;
   // for (int i = 0; i < mudraws.size(); i++) {

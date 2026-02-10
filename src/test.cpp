@@ -106,7 +106,7 @@ double test(Rcpp::NumericVector s1,
   for (int i=0; i<idv1.size(); i++) {
     cout << idv1[i];
   }
-  cout << endl;
+  //cout << endl;
   std::set<int> s;
   unsigned size = idv1.size();
   for( unsigned i = 0; i < size; ++i ) s.insert( idv1[i] );
@@ -123,7 +123,7 @@ double test(Rcpp::NumericVector s1,
   for (int i = 0; i < cnames.size(); i++) {
     cout << cnames[i];
   }
-  cout << endl;
+  //cout << endl;
   Environment env("package:INLA");
   Function inla = env["inla"];
   Rcpp::List myList(2);
@@ -334,7 +334,7 @@ double test2(Rcpp::DataFrame mydf) {
   for (int i = 0; i < Cmat.n_cols; i++) {
     cout << mudraws[i] << " ";
   }
-  cout << endl;
+  //cout << endl;
   std::set<int> s;
   unsigned size = idv1.size();
   for( unsigned i = 0; i < size; ++i ) s.insert( idv1[i] );
