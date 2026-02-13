@@ -1,41 +1,108 @@
+#' Spatial BART Model
+#'
+#' Fits a Bayesian Additive Regression Trees (BART) model with
+#' spatial variance components.
+#'
+#' This function is a simplified interface to the underlying C++ sampler.
+#' The design is inspired by the original BART R package.
+#'
+#' @param x.train Predictor matrix for training data (n × p).
+#' @param y.train Numeric response vector of length n.
+#' @param s1 Spatial coordinate vector (length n).
+#' @param s2 Spatial coordinate vector (length n).
+#' @param x.test Optional predictor matrix for test data.
+#'
+#' @param size Cluster sizes.
+#'
+#' @param ntree Number of trees in the ensemble.
+#' @param numcut Number of cut points per predictor.
+#'
+#' @param ndpost Number of posterior draws to keep.
+#' @param nskip Number of burn-in iterations.
+#' @param keepevery Thinning interval.
+#'
+#' @param sigest Initial estimate of residual standard deviation.
+#' @param sigdf Degrees of freedom for sigma prior.
+#' @param sigquant Quantile used to calibrate sigma prior.
+#'
+#' @param k Tree prior scale parameter.
+#' @param power Tree depth prior parameter.
+#' @param base Tree depth prior parameter.
+#'
+#' @param nwarmup Number of warmup iterations.
+#' @param seed Random seed.
+#'
+#' @param usecoords Logical; whether to use spatial coordinates.
+#'
+#' @return
+#' An object containing:
+#'
+#' \describe{
+#'   \item{yhat.train}{Posterior samples for training data}
+#'   \item{yhat.test}{Posterior samples for test data}
+#'   \item{yhat.train.mean}{Posterior mean predictions for training data}
+#'   \item{yhat.test.mean}{Posterior mean predictions for test data}
+#'   \item{sigma}{Posterior draws of the observation-level residual standard deviation}
+#'   \item{kappas}{Posterior draws of the Matérn inverse range parameter
+#'   \eqn{\kappa = \sqrt{8\nu}/\rho}}
+#'   \item{sigmams}{Posterior draws of the spatial random-effect standard deviation}
+#'   \item{varcount}{Variable inclusion counts}
+#'   \item{varprob}{Variable inclusion probabilities}
+#'   \item{proc.time}{Execution time}
+#' }
+#'
+#' }
+#'
 #' @references
-#' Chipman, H., George, E., McCulloch, R. (2010).
-#' BART: Bayesian Additive Regression Trees.
+#' Jiang, A. Z., & Wakefield, J. (2025).
+#' BARTSIMP: Flexible spatial covariate modeling and prediction using
+#' Bayesian Additive Regression Trees.
+#' *Spatial and Spatio-temporal Epidemiology*, 55, 100757.
+#' https://doi.org/10.1016/j.sste.2025.100757
 #'
 #' The interface design is inspired by the BART R package.
 #' @export
 bartsimp=function(
-  x.train, y.train,s1,s2, x.test=matrix(0.0,0,0),
-  size = rep(1,length(s1)),
-  weighted = FALSE,
-  sparse=FALSE, theta=0, omega=1,
-  a=0.5, b=1, augment=FALSE, rho=NULL,
-  xinfo=matrix(0.0,0,0), usequants=FALSE,
-  cont=FALSE, rm.const=TRUE,
-  sigest=0.1, sigdf=3, sigquant=.90,
-  k=2.0, power=2.0, base=.95,
-  sigmaf=NA, lambda=NA,
-  treeprev = NA,
-  fmean=mean(y.train),
-  w=rep(1,length(y.train)),
-  ntree=3L, numcut=100L,
-  ndpost=500L, nskip=1L, keepevery=1L,
-  nkeeptrain=ndpost, nkeeptest=ndpost,
-  nkeeptestmean=ndpost, nkeeptreedraws=ndpost,
-  printevery=100L, transposed=FALSE,
-  seed = 99L, iftest=FALSE, isexact=FALSE, nwarmup=500,
-  usecoords = TRUE,
-  sigest_new = 1, range_new = 5, sig_m_new = 1,
-  rho_0 = 2.4, sigmam_0 = 0.55,
-  alpha_1 = 0.05, alpha_2 = 0.05,
-  doBART = FALSE
+    x.train, y.train,s1,s2, x.test=matrix(0.0,0,0),
+    size = rep(1,length(s1)),
+    theta=0, omega=1,
+    a=0.5, b=1, augment=FALSE, rho=NULL,
+    xinfo=matrix(0.0,0,0), usequants=FALSE,
+    cont=FALSE, rm.const=TRUE,
+    sigest=0.1, sigdf=3, sigquant=.90,
+    k=2.0, power=2.0, base=.95,
+    sigmaf=NA, lambda=NA,
+    treeprev = NA,
+    fmean=mean(y.train),
+    w=rep(1,length(y.train)),
+    ntree=3L, numcut=100L,
+    ndpost=500L, nskip=1L, keepevery=1L,
+    nkeeptrain=ndpost, nkeeptest=ndpost,
+    nkeeptestmean=ndpost, nkeeptreedraws=ndpost,
+    printevery=100L, transposed=FALSE,
+    seed = 99L, nwarmup=500,
+    usecoords = TRUE,
+    sigest_new = 1, range_new = 5, sig_m_new = 1,
+    rho_0 = 2.4, sigmam_0 = 0.55,
+    alpha_1 = 0.05, alpha_2 = 0.05
 )
 {
-  #--------------------------------------------------
+  # --------------------------------------------------
+  # DEBUG MODE CONTROL
+  debug_mode <- isTRUE(getOption("BARTSIMP.debug", FALSE))
+  iftest  <- debug_mode
+  isexact <- debug_mode
+  doBART  <- debug_mode
+
+  # --------------------------------------------------
+  # INTERNAL FLAGS (not user-facing)
+  weighted <- FALSE
+  sparse <- FALSE
+
+  # --------------------------------------------------
   #data
   colvars <- colnames(x.train)
   n = length(y.train)
-  #print(numcut)
   set.seed(seed)
 
   if(!transposed) {
@@ -65,11 +132,8 @@ bartsimp=function(
   if(length(rm.const)==0) rm.const <- 1:p
   if(length(grp)==0) grp <- 1:p
 
-  ##if(p>1 & length(numcut)==1) numcut=rep(numcut, p)
-
   y.train = y.train-fmean
-  #--------------------------------------------------
-  #set nkeeps for thinning
+
   if((nkeeptrain!=0) & ((ndpost %% nkeeptrain) != 0)) {
     nkeeptrain=ndpost
     cat('*****nkeeptrain set to ndpost\n')
@@ -86,8 +150,7 @@ bartsimp=function(
     nkeeptreedraws=ndpost
     cat('*****nkeeptreedraws set to ndpost\n')
   }
-  #--------------------------------------------------
-  #prior
+
   nu=sigdf
   if(is.na(lambda)) {
     if(is.na(sigest)) {
@@ -100,7 +163,7 @@ bartsimp=function(
       }
     }
     qchi = qchisq(1.0-sigquant,nu)
-    lambda = (sigest*sigest*qchi)/nu #lambda parameter for sigma prior
+    lambda = (sigest*sigest*qchi)/nu
   } else {
     sigest=sqrt(lambda)
   }
@@ -110,47 +173,32 @@ bartsimp=function(
   } else {
     tau = sigmaf/sqrt(ntree)
   }
-  ## 20220918 update
-  #--- set spatial hyperpars
+
   x_train <- as.data.frame(t(x.train))
   colnames(x_train) <- colvars
-  # hyperpar <- tunehyperpriors(x_train = x_train,
-  #                 y_train = y.train,
-  #                 s1 = s1,
-  #                 s2 = s2)
-  sigest_new <- sigest_new#1.1#hyperpar$sigest_new
-  range_new <- range_new#hyperpar$range_new
-  sig_m_new <- sig_m_new#hyperpar$sig_m_new
-  rho_0 <- rho_0#2.4#hyperpar$rho_0
-  sigmam_0 <- sigmam_0#0.55#hyperpar$sigmam_0
+
+  sigest_new <- sigest_new
+  range_new <- range_new
+  sig_m_new <- sig_m_new
+  rho_0 <- rho_0
+  sigmam_0 <- sigmam_0
   alpha_1 <- alpha_1
   alpha_2 <- alpha_2
-  # dist_vec <- as.vector(dist(s_mat))
-  # rho_0 <- quantile(dist_vec, 0.5)/2.5
-  # sigmam_0 <- sigest * 2.5
-  # ## fit INLA model
 
-
-
-  #--- set unique
   x.unique <- x.train[,cumsum(size)]
-  #print(dim(x.unique))
   n.unique <- length(size)
 
-  #--- check if we need to load from a previous tree object
   if (is.na(treeprev)) {
     tree.update <- FALSE
     treeprev_last <- NA
   } else {
     print("use previous updates")
     tree.update <- TRUE
-    # only need the last one!
-    treeprev_last <- treeprev#[[length(treeprev)]]
+    treeprev_last <- treeprev
   }
 
-  #--------------------------------------------------
   ptm <- proc.time()
-  #call
+
   res <- invisible(
     capture.output({
       tmp <- .Call("cwbart",
@@ -176,8 +224,6 @@ bartsimp=function(
 
   res <- tmp
 
-
-
   res$proc.time <- proc.time()-ptm
 
   res$mu = fmean
@@ -189,7 +235,6 @@ bartsimp=function(
     names(res$treedraws$cutpoints) = dimnames(x.train)[[1]]
   dimnames(res$varcount)[[2]] = as.list(dimnames(x.train)[[1]])
   dimnames(res$varprob)[[2]] = as.list(dimnames(x.train)[[1]])
-  ##res$nkeeptreedraws=nkeeptreedraws
   res$varcount.mean <- apply(res$varcount, 2, mean)
   res$varprob.mean <- apply(res$varprob, 2, mean)
   res$rm.const <- rm.const
@@ -200,13 +245,4 @@ bartsimp=function(
 
   attr(res, 'class') <- 'wbart'
   return(res)
-}
-
-
-# Backward-compatibility wrapper
-#' @rdname wbart_spatial
-#' @export
-mywbart <- function(...) {
-  .Deprecated("bartsimp")
-  bartsimp(...)
 }
