@@ -71,7 +71,8 @@ fit <- bartsimp(
   ntree = 10, # number of trees
   ndpost = 10, # number of posterior samples
   nwarmup = 10, # number of warmup samples 
-  seed = 1
+  seed = 1,
+  iftest = TRUE
 )
 
 
