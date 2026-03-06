@@ -2,6 +2,7 @@
 
 export(bartModelMatrix)
 export(bartsimp)
+export(bartsimp_predict)
 export(callPrint)
 export(convertC)
 export(makeC)

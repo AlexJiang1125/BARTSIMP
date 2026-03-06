@@ -10,7 +10,8 @@ bartsimp(
   s1,
   s2,
   x.test = matrix(0, 0, 0),
-  size = rep(1, length(s1)),
+  s1.test = NULL,
+  s2.test = NULL,
   theta = 0,
   omega = 1,
   a = 0.5,
@@ -66,8 +67,6 @@ bartsimp(
 
 \item{x.test}{Optional predictor matrix for test data.}
 
-\item{size}{Cluster sizes.}
-
 \item{sigest}{Initial estimate of residual standard deviation.}
 
 \item{sigdf}{Degrees of freedom for sigma prior.}
@@ -95,6 +94,8 @@ bartsimp(
 \item{nwarmup}{Number of warmup iterations.}
 
 \item{usecoords}{Logical; whether to use spatial coordinates.}
+
+\item{size}{Cluster sizes.}
 }
 \value{
 An object containing:

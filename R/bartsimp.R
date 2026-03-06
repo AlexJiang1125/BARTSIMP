@@ -63,8 +63,7 @@
 #' The interface design is inspired by the BART R package.
 #' @export
 bartsimp=function(
-    x.train, y.train,s1,s2, x.test=matrix(0.0,0,0),
-    size = rep(1,length(s1)),
+    x.train, y.train, s1, s2, x.test = matrix(0.0,0,0), s1.test = NULL, s2.test = NULL,
     theta=0, omega=1,
     a=0.5, b=1, augment=FALSE, rho=NULL,
     xinfo=matrix(0.0,0,0), usequants=FALSE,
@@ -87,6 +86,38 @@ bartsimp=function(
     alpha_1 = 0.05, alpha_2 = 0.05
 )
 {
+  # --------------------------------------------------
+  # preprocess and validate train/test inputs
+  train_dat <- preprocess_train_data(
+    x_train = x.train,
+    y_train = y.train,
+    s1 = s1,
+    s2 = s2
+  )
+
+  x.train <- train_dat$x_train
+  y.train <- train_dat$y_train
+  s1 <- train_dat$s1
+  s2 <- train_dat$s2
+  size <- train_dat$size
+
+  if (!is.null(s1.test) || !is.null(s2.test) || length(x.test) > 0) {
+    if (is.null(s1.test) || is.null(s2.test)) {
+      stop("Both s1.test and s2.test must be supplied when x.test is provided.")
+    }
+
+    test_dat <- preprocess_test_data(
+      x_test = x.test,
+      s_test = data.frame(s1 = s1.test, s2 = s2.test)
+    )
+
+    x.test <- test_dat$x_test
+    s.test <- test_dat$s_test
+  } else {
+    x.test <- matrix(0.0, 0, 0)
+    s.test <- data.frame(s1 = numeric(0), s2 = numeric(0))
+  }
+
   # --------------------------------------------------
   # DEBUG MODE CONTROL
   debug_mode <- isTRUE(getOption("BARTSIMP.debug", FALSE))
@@ -184,6 +215,8 @@ bartsimp=function(
   sigmam_0 <- sigmam_0
   alpha_1 <- alpha_1
   alpha_2 <- alpha_2
+
+
 
   x.unique <- x.train[,cumsum(size)]
   n.unique <- length(size)

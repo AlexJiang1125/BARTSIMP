@@ -608,9 +608,11 @@ RcppExport SEXP cwbart(
     ret["sigmams"] = sigmams;
     ret["kappas"] = kappas;
     //ret["mliks"] = mliks;
+    ret["mesh"] = bm.getdinfo().mesh;
+    ret["A_unique"] = bm.getdinfo().A_unique;
     return ret;
 #else
 
 #endif
 
-  }
+}

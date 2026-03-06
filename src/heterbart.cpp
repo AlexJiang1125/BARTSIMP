@@ -320,54 +320,68 @@ void heterbart::makemesh_bypoints() {
   di.A = Rcpp::as<arma::sp_mat>(A);
 }
 
-// create mesh, by points
-void heterbart::makemesh_bypoints_unique() {
-  Environment env("package:INLA");
-  Rcpp::List myList(2);
-  Function inlaMesh2D = env["inla.mesh.2d"];
-  Rcpp::NumericVector domainvec = {0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0};
-  domainvec.attr("dim") = Rcpp::Dimension(4,2);
-  Rcpp::CharacterVector namevec;
-  std::string namestem = "Column Heading";
-  Function unique("unique");
-  Rcpp::NumericVector it_s1 = unique(di.s1);
-  Rcpp::NumericVector it_s2 = unique(di.s2);
 
-  myList[0] = it_s1;
-  myList[1] = it_s2;
+// create mesh from unique spatial point pairs
+void heterbart::makemesh_bypoints_unique() {
+  Rcpp::Environment env("package:INLA");
+  Rcpp::Function inlaMesh2D = env["inla.mesh.2d"];
+  Rcpp::Function inlaSpdeMakeA = env["inla.spde.make.A"];
+  Rcpp::Function unique_fun("unique");
+
+  // ------------------------------------------------------------------
+  // 1. Build coordinate data frame from paired locations
+  // ------------------------------------------------------------------
+  Rcpp::DataFrame coords_df = Rcpp::DataFrame::create(
+    Rcpp::_["cx"] = di.s1,
+    Rcpp::_["cy"] = di.s2
+  );
+
+  // Unique rows of (s1, s2), not unique(s1) and unique(s2) separately
+  Rcpp::DataFrame unique_coords_df = unique_fun(coords_df);
+
+  // Convert to matrix for INLA projection
+  Rcpp::NumericMatrix coords_unique =
+    Rcpp::internal::convert_using_rfunction(unique_coords_df, "as.matrix");
+
+  // ------------------------------------------------------------------
+  // 2. Compute spatial scale from observed coordinates
+  // ------------------------------------------------------------------
   double xmin = Rcpp::min(di.s1);
   double xmax = Rcpp::max(di.s1);
   double ymin = Rcpp::min(di.s2);
   double ymax = Rcpp::max(di.s2);
-  double avg_lth = (ymax - ymin + xmax - xmin)*0.5;
-  double edge_1 = 0.1*avg_lth;
-  double edge_2 = 0.2*avg_lth;
 
-  Rcpp::NumericVector edge_arg = {edge_1,edge_2};
-  double cutoff = 0.05*avg_lth;
-  namevec.push_back("cx");
-  namevec.push_back("cy");
-  myList.attr("names") = namevec;
-  Rcpp::DataFrame dfout(myList);
-  Rcpp::List mesh = inlaMesh2D(Rcpp::_["loc.domain"] = dfout,
-                               Rcpp::_["max.edge"] = edge_arg,
-                               Rcpp::_["cutoff"] = cutoff);
+  double avg_lth = 0.5 * ((xmax - xmin) + (ymax - ymin));
+
+  // guard against degenerate scale
+  if (avg_lth <= 0.0) {
+    Rcpp::stop("Spatial coordinates have zero range; cannot build mesh.");
+  }
+
+  Rcpp::NumericVector edge_arg = Rcpp::NumericVector::create(
+    0.1 * avg_lth,
+    0.2 * avg_lth
+  );
+  double cutoff = 0.05 * avg_lth;
+
+  // ------------------------------------------------------------------
+  // 3. Build mesh from unique point pairs
+  // ------------------------------------------------------------------
+  Rcpp::List mesh = inlaMesh2D(
+    Rcpp::_["loc"] = coords_unique,
+    Rcpp::_["max.edge"] = edge_arg,
+    Rcpp::_["cutoff"] = cutoff
+  );
+
   di.mesh = mesh;
-  int nmesh = mesh["n"];
-  Function inlaSpdeMakeA = env["inla.spde.make.A"];
-  Rcpp::List myList_coords(2);
-  Rcpp::CharacterVector namevec_coords;
-  std::string namestem_coords = "Column Heading";
-  myList_coords[0] = it_s1;
-  namevec_coords.push_back("cx");
-  myList_coords[1] = it_s2;
-  namevec_coords.push_back("cy");
-  myList.attr("names") = namevec_coords;
-  Rcpp::DataFrame dfout_coords(myList_coords);
-  NumericMatrix coords = internal::convert_using_rfunction(dfout_coords, "as.matrix");
+
+  // ------------------------------------------------------------------
+  // 4. Build A matrix at the unique observed locations
+  // ------------------------------------------------------------------
   Rcpp::S4 A = inlaSpdeMakeA(
     Rcpp::_["mesh"] = di.mesh,
-    Rcpp::_["loc"] = coords
+    Rcpp::_["loc"] = coords_unique
   );
+
   di.A_unique = Rcpp::as<arma::sp_mat>(A);
 }
