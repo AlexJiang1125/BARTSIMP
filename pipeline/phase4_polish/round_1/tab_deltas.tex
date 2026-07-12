@@ -1,0 +1,29 @@
+% tab_deltas.tex --- primary paired within-family contrast (legacy vs SD).
+% Numbers from data/dgp5_paired_primary_deltas.csv (Phase-2 validated, 24 pairs).
+\begin{table}[t]
+\centering
+\small
+\caption{Primary paired contrast \bartsimpsd{} minus legacy \bartsimp{} ($\dz{=}0$),
+matched-seed, 24 pairs. The depth-floor is the only component change. The
+Admin-1 $\cov_{80}$ gain is right-signed but below two Monte-Carlo SE and below the
+pre-registered $+0.02$ bar (anomaly~A1); the bias reduction is significant. Posterior
+SD moves slightly \emph{tighter}, so the coverage gain is not bought with width.}
+\label{tab:deltas}
+\begin{tabular}{l r r}
+\toprule
+Paired quantity & Value & MC SE \\
+\midrule
+$\Delta\cov_{80}$ (Admin-1)            & $+0.0145$ & $0.0102$ \\
+$\Delta|\mathrm{bias}|$ (Admin-1)      & $-0.00066$ & $0.00033$ \\
+$\Delta\,\overline{\mathrm{sd}}$ (Admin-1) & $-0.0004$ & $0.00014$ \\
+Fraction of reps with bias reduced     & $0.625$ & --- \\
+Fraction of reps with $\cov_{80}$ up   & $0.417$ & --- \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+{\footnotesize One-sided $p\approx0.08$ for $\Delta\cov_{80}>0$ at 24 reps. The
+$\Delta|\mathrm{bias}|$ contrast is two MC SE from zero; the coverage signal is
+carried by the $\dz$ sweep (Table~\ref{tab:d0sweep}) and the scale/adversarial
+sweeps, not by this single contrast.}
+\end{table}

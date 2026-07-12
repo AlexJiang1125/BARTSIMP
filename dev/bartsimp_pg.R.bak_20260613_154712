@@ -1,0 +1,784 @@
+# =============================================================================
+# BARTSIMP-PG: shared R sampler module
+# =============================================================================
+# Pólya-Gamma + Matérn-SPDE + BART sampler in the Woodbury form.
+# Used by the validation scripts 05--07. Source `dev/rbart.R` first.
+# =============================================================================
+
+if (!exists("ensemble_sweep")) source("dev/rbart.R")
+
+suppressPackageStartupMessages({
+  library(BayesLogit)
+  library(Matrix)
+  library(INLA)
+})
+INLA::inla.setOption(fmesher.evolution.warn = FALSE)
+
+# -----------------------------------------------------------------------------
+# Matérn correlation (nu = 1 fixed throughout)
+# -----------------------------------------------------------------------------
+matern_corr <- function(d, kappa, nu = 1) {
+  out <- (2^(1 - nu)) / gamma(nu) * (kappa * d)^nu * besselK(kappa * d, nu)
+  out[d == 0] <- 1; out
+}
+
+# -----------------------------------------------------------------------------
+# Sparse SPDE precision Q_psi for given (sigma_m, rho)
+# theta convention: (log(range), log(sigma_m))
+# -----------------------------------------------------------------------------
+make_Qpsi <- function(spde, sigma_m, rho) {
+  INLA::inla.spde.precision(spde, theta = c(log(rho), log(sigma_m)))
+}
+
+# -----------------------------------------------------------------------------
+# Woodbury marginal log-likelihood + posterior factorization for z draw
+# -----------------------------------------------------------------------------
+margprob_woodbury <- function(yhat, Omega, A, Q_psi) {
+  AtWA  <- Matrix::crossprod(A, as.vector(Omega) * A)
+  Qu    <- Matrix::forceSymmetric(AtWA + Q_psi)
+  Fchol <- Matrix::Cholesky(Qu, LDL = FALSE, super = FALSE, perm = FALSE)
+  rhs   <- as.numeric(Matrix::crossprod(A, Omega * yhat))
+  m_u   <- as.numeric(Matrix::solve(Fchol, rhs, system = "A"))
+  quad        <- sum(Omega * yhat^2) - sum(rhs * m_u)
+  logdet_W    <- sum(log(Omega))
+  logdet_Qpsi <- as.numeric(Matrix::determinant(Q_psi, logarithm = TRUE)$modulus)
+  # log|Q_u| read off the Cholesky factor we already computed -- avoids the
+  # full re-factorization Matrix::determinant(Qu) would otherwise do.
+  # sqrt = FALSE makes determinant return log|L L'| = log|Q_u| directly;
+  # set explicitly because the package default is changing.
+  logdet_Qu   <- as.numeric(Matrix::determinant(Fchol, logarithm = TRUE,
+                                                sqrt = FALSE)$modulus)
+  N <- length(yhat)
+  mlik <- 0.5 * (-N * log(2 * pi) + logdet_W + logdet_Qpsi - logdet_Qu - quad)
+  list(mlik = mlik, m_u = m_u, Fchol = Fchol)
+}
+
+draw_z_woodbury <- function(m_u, Fchol, A) {
+  eta <- rnorm(length(m_u))
+  u   <- m_u + as.numeric(Matrix::solve(Fchol, eta, system = "Lt"))
+  list(u = u, z = as.numeric(A %*% u))
+}
+
+# -----------------------------------------------------------------------------
+# Restricted-spatial-regression z draw against a FIXED low-rank basis.
+#   B0       : n_cl x K matrix; constraint is B0' z = 0
+#   C_mat    : K x n_mesh sparse matrix = B0' A, precomputed
+#   m_u, Fchol, A : same as draw_z_woodbury
+# Returns the projected u and z satisfying B0' z = 0 (and hence
+# (B0' A) u = 0) exactly.
+# -----------------------------------------------------------------------------
+draw_z_woodbury_rsr <- function(m_u, Fchol, A, C_mat) {
+  eta <- rnorm(length(m_u))
+  u_unc <- m_u + as.numeric(Matrix::solve(Fchol, eta, system = "Lt"))
+
+  # Q_u^{-1} C' : n_mesh x K (K cheap back-solves)
+  QuC <- Matrix::solve(Fchol, Matrix::t(C_mat), system = "A")
+  # C Q_u^{-1} C' : K x K dense
+  CQC <- as.matrix(C_mat %*% QuC)
+  # C u_unc : K
+  Cu  <- as.numeric(C_mat %*% u_unc)
+  # correction = Q_u^{-1} C' (C Q_u^{-1} C')^{-1} (C u_unc)
+  correction <- as.numeric(QuC %*% solve(CQC, Cu))
+  u <- u_unc - correction
+  list(u = u, z = as.numeric(A %*% u))
+}
+
+# -----------------------------------------------------------------------------
+# Helper: build the linear+interaction basis B0 = [1, x1, x2, x1*x2]
+# for a 2-covariate design. Generalizes naturally to >2 covariates by adding
+# columns for each x_p and each pair x_p * x_q, but for our current setup we
+# keep it simple.
+# -----------------------------------------------------------------------------
+make_rsr_basis_linear_interaction <- function(X) {
+  if (ncol(X) < 2)
+    stop("Need at least 2 covariates for linear+interaction basis.")
+  cbind(intercept = rep(1, nrow(X)),
+        x1        = X[, 1],
+        x2        = X[, 2],
+        x1x2      = X[, 1] * X[, 2])
+}
+
+# -----------------------------------------------------------------------------
+# Path A (BD marginal) marginal log-likelihood
+# -----------------------------------------------------------------------------
+# Computes the tree-dependent part of
+#
+#   log p(r | T_l, T_{-l}, mu_{-l}, psi, Omega)
+#
+# integrating out BOTH the tree's leaf values mu_l AND the spatial field z.
+# Returns the H-dependent part only -- constants in r, W, Q_psi cancel in
+# BD MH ratios (the proposal doesn't change those).
+#
+# Math: with H the leaf-indicator matrix (n_cl x B_l), W = diag(Omega),
+#   m_u0 = Q_u^{-1} A' W r  (cached, Path B's z-posterior mean given r),
+#
+#   f(H) = -B_l/2 log(tau^2) - 1/2 log|S(H)| + 1/2 v(H)' S(H)^{-1} v(H)
+#
+# where
+#   S(H) = diag(1/tau^2 + S_b) - (H' W A) Q_u^{-1} (H' W A)'
+#   v(H) = H' W (r - A m_u0)
+#   S_b  = sum_{i in leaf b} Omega_i
+#
+# Inputs:
+#   leaf_assign : integer vector length n_cl giving leaf id per cluster
+#   r           : residual length n_cl (= ybar* - sum of OTHER trees, NO z subtraction)
+#   Omega       : per-cluster precision length n_cl
+#   A           : sparse projection n_cl x n_mesh
+#   Qu_chol     : Matrix::Cholesky factor of Q_u = Q_psi + A' W A  (cached)
+#   m_u0        : Q_u^{-1} A' W r  (cached)
+#   tau2        : leaf prior variance
+# -----------------------------------------------------------------------------
+margprob_marginal_pathA <- function(leaf_assign, r, Omega, A, Qu_chol, m_u0, tau2) {
+  leaf_ids <- sort(unique(leaf_assign))
+  B_l      <- length(leaf_ids)
+
+  # H is n_cl x B_l indicator; we never materialize it as a dense matrix.
+  # Per-leaf summaries:
+  #   S_b   = sum Omega_i        (B_l)
+  #   wmu_b = sum Omega_i r_i    (B_l)         => H' W r
+  #   HWA_b = sum Omega_i A_i.   (B_l x n_mesh)  => H' W A
+  #
+  S_b   <- numeric(B_l)
+  wmu_b <- numeric(B_l)
+  HWA   <- Matrix::Matrix(0, nrow = B_l, ncol = ncol(A), sparse = TRUE)
+  Omr   <- Omega * r
+  for (b in seq_along(leaf_ids)) {
+    idx       <- which(leaf_assign == leaf_ids[b])
+    S_b[b]    <- sum(Omega[idx])
+    wmu_b[b]  <- sum(Omr[idx])
+    HWA[b, ] <- Matrix::colSums(Omega[idx] * A[idx, , drop = FALSE])
+  }
+
+  # v(H) = H' W (r - A m_u0)
+  v <- wmu_b - as.numeric(HWA %*% m_u0)
+
+  # M = Q_u^{-1} (H' W A)'  -- via cached Cholesky, B_l back-solves
+  M <- Matrix::solve(Qu_chol, Matrix::t(HWA), system = "A")
+  # S = diag(1/tau^2 + S_b) - (H' W A) M
+  S <- diag(B_l) * (1/tau2 + S_b)
+  S <- S - as.matrix(HWA %*% M)
+  S <- 0.5 * (S + t(S))           # symmetrize for numerics
+
+  # log|S|, S^{-1} v via dense Cholesky on B_l x B_l
+  Lchol <- tryCatch(chol(S), error = function(e) NULL)
+  if (is.null(Lchol)) return(-Inf)
+  logdet_S <- 2 * sum(log(diag(Lchol)))
+  Sinv_v   <- backsolve(Lchol, backsolve(Lchol, v, transpose = TRUE))
+  quad     <- sum(v * Sinv_v)
+
+  -0.5 * B_l * log(tau2) - 0.5 * logdet_S + 0.5 * quad
+}
+
+# -----------------------------------------------------------------------------
+# PC prior on (rho, sigma_m)
+# -----------------------------------------------------------------------------
+make_log_pc_prior <- function(rho_0 = 0.10, sigma_0 = 2.0,
+                              alpha_1 = 0.05, alpha_2 = 0.05, d_dim = 2) {
+  lam1 <- -log(alpha_1) * rho_0^(d_dim/2)
+  lam2 <- -log(alpha_2) / sigma_0
+  function(rho, sigma_m) {
+    log(d_dim/2) + log(lam1) + log(lam2) -
+      (d_dim/2 + 1) * log(rho) -
+      lam1 * rho^(-d_dim/2) - lam2 * sigma_m
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Simulate binary spatial dataset
+#   covariate_signal: TRUE -> tree-structured f, FALSE -> f == 0
+#   spatial_signal:   TRUE -> Matérn GRF z, FALSE -> z == 0
+# -----------------------------------------------------------------------------
+gen_data <- function(seed, n_cl = 200,
+                     covariate_signal = TRUE,
+                     spatial_signal   = TRUE,
+                     sigma_m_sim = 0.8, rho_sim = 0.3,
+                     n_min = 5, n_max = 15,
+                     # GLM-style intercept on logit scale. eta = alpha_0 + f + z + xi.
+                     # 0 ↔ p ≈ 0.5; qlogis(0.10) ≈ -2.20 ↔ p ≈ 10%, etc.
+                     alpha_0 = 0,
+                     # Cluster-level overdispersion: xi_i ~ N(0, sigma_xi^2).
+                     # 0 → pass-through (no RE, matches the original DGM).
+                     sigma_xi = 0) {
+  set.seed(seed)
+  nu <- 1
+  x1 <- runif(n_cl); x2 <- runif(n_cl)
+  X  <- cbind(x1, x2); colnames(X) <- c("x1", "x2")
+  locs <- cbind(runif(n_cl), runif(n_cl))
+  n_i  <- as.numeric(sample(n_min:n_max, n_cl, replace = TRUE))
+
+  if (covariate_signal) {
+    # Piecewise-constant tree. Original (unshifted) values would give
+    # analytic mean +0.5; we subtract that so the BART signal is
+    # mean-zero by construction — then alpha_0 controls the marginal
+    # level cleanly (mean(eta) = alpha_0 + 0 + 0). The marginal p still
+    # drifts slightly above plogis(alpha_0) due to Jensen's inequality
+    # on plogis with var(eta) > 0; that's intrinsic to the GLM DGM.
+    f_true <- ifelse(x1 < 0.5, 1.5, ifelse(x2 < 0.5, -1.0, 0)) - 0.5
+  } else {
+    f_true <- rep(0, n_cl)
+  }
+  if (spatial_signal) {
+    D <- as.matrix(dist(locs))
+    kappa_sim <- sqrt(8 * nu) / rho_sim
+    Sz <- sigma_m_sim^2 * matern_corr(D, kappa_sim, nu) + 1e-6 * diag(n_cl)
+    z_true <- as.vector(t(chol(Sz)) %*% rnorm(n_cl))
+  } else {
+    z_true <- rep(0, n_cl)
+  }
+  xi_true <- if (sigma_xi > 0) rnorm(n_cl, mean = 0, sd = sigma_xi) else rep(0, n_cl)
+  eta_true <- alpha_0 + f_true + z_true + xi_true
+  p_true   <- plogis(eta_true)
+  k_i      <- vapply(seq_len(n_cl),
+                     function(i) sum(rbinom(n_i[i], 1, p_true[i])),
+                     numeric(1))
+  list(X = X, locs = locs, n_i = n_i, k_i = k_i,
+       f_true = f_true, z_true = z_true, xi_true = xi_true,
+       eta_true = eta_true, p_true = p_true,
+       alpha_0 = alpha_0, sigma_xi = sigma_xi,
+       sigma_m_sim = if (spatial_signal) sigma_m_sim else 0,
+       rho_sim     = if (spatial_signal) rho_sim     else NA_real_)
+}
+
+# -----------------------------------------------------------------------------
+# Run the BARTSIMP-PG sampler.
+# Returns posterior draws + mesh objects for downstream prediction.
+# -----------------------------------------------------------------------------
+run_sampler_bartsimp_pg <- function(X, locs, n_i, k_i,
+                                    f_true = NULL, z_true = NULL,
+                                    n_iter = 1500, burn = 500,
+                                    m_trees = 20, k_bart = 2,
+                                    alpha_bart = 0.95, beta_bart = 2,
+                                    sd_log_sigma = 0.15, sd_log_rho = 0.15,
+                                    adapt_psi      = TRUE,
+                                    psi_target_acc = 0.234,
+                                    adapt_decay    = 0.6,
+                                    init_sigma_m = 0.8, init_rho = 0.5,
+                                    # PC priors on (range, sigma_m) — anchored
+                                    # at the two-stage diagnostic estimate
+                                    # (rho ≈ 0.04°, sigma_m ≈ 0.10) so they don't
+                                    # fight the data. See modeling_mistakes/
+                                    # _run_history.md "Production v3" entry.
+                                    rho_0 = 0.05, sigma_0 = 0.2,
+                                    alpha_1 = 0.5, alpha_2 = 0.5,
+                                    # The matching INLA spde2 pcmatern priors
+                                    # (these set the SPDE precision prior;
+                                    # should agree with the MH-side rho/sigma
+                                    # priors above).
+                                    spde_prior_range = c(0.05, 0.5),
+                                    spde_prior_sigma = c(0.2, 0.5),
+                                    mesh_max_edge = c(0.08, 0.25),
+                                    mesh_cutoff = 0.03,
+                                    use_dart = FALSE,
+                                    alpha_dart = 1.0,
+                                    bd_mode = c("conditional", "marginal"),
+                                    rsr_basis = NULL,
+                                    X_pred  = NULL,
+                                    locs_pred = NULL,
+                                    save_post_ensembles = TRUE,
+                                    # Storage compaction at end-of-run: drop
+                                    # post-only redundant fields (f_draws, z_draws
+                                    # are regenerable from ensemble_snapshots+u),
+                                    # drop burn-in slab of u_draws, and strip
+                                    # parent/depth from saved BART trees (only
+                                    # used during fit, not at predict).
+                                    compact_storage = TRUE,
+                                    # Cluster-level overdispersion via a
+                                    # logit-normal random effect xi_i. See
+                                    # dev/beta_binomial_extension.md §3-5.
+                                    # When enable_re=TRUE adds:
+                                    #   logit(p_i) = f(x_i) + u(s_i) + xi_i
+                                    #   xi_i ~ N(0, sigma2_xi)
+                                    #   sigma2_xi ~ Inv-Gamma(a_sigma, b_sigma)
+                                    # The two new Gibbs steps are closed-form;
+                                    # see math doc §5 steps 4–5. Default OFF so
+                                    # backward compat with existing fits is exact.
+                                    enable_re      = FALSE,
+                                    a_sigma        = 2,
+                                    b_sigma        = 0.1,
+                                    init_sigma2_xi = 0.1,
+                                    # Crash-safe MCMC: every `checkpoint_every_iter`
+                                    # iterations write the full sampler state (current
+                                    # Gibbs values + accumulated draws + RNG state)
+                                    # atomically to `checkpoint_path`. On the next
+                                    # call with the same `checkpoint_path` and an
+                                    # existing checkpoint file, the sampler resumes
+                                    # from `last_iter + 1`. Static structures (mesh,
+                                    # spde, A, ...) are re-derived from input each
+                                    # run; only sampler state needs to persist.
+                                    # On clean completion, the checkpoint is removed.
+                                    # Disabled when checkpoint_path = NULL.
+                                    checkpoint_path = NULL,
+                                    checkpoint_every_iter = 500L,
+                                    # GLM-style fixed offset on the latent scale,
+                                    # matching the convention in dbarts (binaryOffset)
+                                    # and BART::pbart (offset). NULL (default) →
+                                    # auto-compute as qlogis(p_bar_train). 0 →
+                                    # legacy behaviour (no offset; BART implicitly
+                                    # absorbs the intercept via its leaves). User
+                                    # supplied numeric → fixed at that value.
+                                    # See experiments/sim_sparsity/setup.md
+                                    # for why this matters in sparse-counts regimes.
+                                    binary_offset = NULL,
+                                    verbose_every = 200,
+                                    label = "") {
+  bd_mode <- match.arg(bd_mode)
+  n_cl <- nrow(X)
+  P    <- ncol(X)
+
+  mesh <- INLA::inla.mesh.2d(loc = locs, max.edge = mesh_max_edge,
+                             cutoff = mesh_cutoff)
+  spde <- INLA::inla.spde2.pcmatern(mesh, prior.range = spde_prior_range,
+                                          prior.sigma = spde_prior_sigma)
+  A <- as(INLA::inla.spde.make.A(mesh = mesh, loc = locs), "CsparseMatrix")
+
+  # Optional RSR basis: build B0 and C = B0' A once
+  if (is.null(rsr_basis)) {
+    B0_mat <- NULL
+    C_mat  <- NULL
+  } else {
+    if (is.character(rsr_basis) && rsr_basis == "linear_interaction") {
+      B0_mat <- make_rsr_basis_linear_interaction(X)
+    } else if (is.matrix(rsr_basis) || inherits(rsr_basis, "Matrix")) {
+      B0_mat <- as.matrix(rsr_basis)
+    } else {
+      stop("rsr_basis must be NULL, 'linear_interaction', or a matrix")
+    }
+    C_mat <- as(Matrix::crossprod(B0_mat, A), "CsparseMatrix")
+  }
+
+  tau2 <- (3 / (k_bart * sqrt(m_trees)))^2
+  log_pc_prior <- make_log_pc_prior(rho_0, sigma_0, alpha_1, alpha_2)
+
+  # --- GLM-style fixed offset on the latent (logit) scale ---
+  # Standard practice in BART for binary/count outcomes (dbarts binaryOffset,
+  # BART::pbart offset): treat the marginal level as a fixed scalar so BART
+  # trees only need to represent deviations from it. Leaf prior N(0, tau²) is
+  # then aligned with the residual signal. Mitigates the sparse-counts
+  # identifiability problem where trees can't sum to a large negative offset.
+  p_bar <- pmin(pmax(sum(k_i) / sum(n_i), 1e-3), 1 - 1e-3)
+  if (is.null(binary_offset)) {
+    binary_offset <- qlogis(p_bar)   # standard: auto-compute from data
+  }
+  # f_init = 0: BART trees start at zero. The offset carries the intercept.
+  # Setting binary_offset = 0 explicitly reproduces the legacy (pre-2026-06-07)
+  # behaviour where f_init = qlogis(p_bar) was the per-tree initialization.
+  f_init <- 0
+
+  if (enable_re && bd_mode != "conditional")
+    stop("enable_re = TRUE is currently supported only with bd_mode = 'conditional'. ",
+         "The marginal mode would require integrating xi out of the BART target, ",
+         "which is not yet implemented.")
+
+  # Per-iteration predictions at user-supplied grid (for proper ACR)
+  # Constructed here because A_pred depends only on mesh + locs_pred (static).
+  if (!is.null(X_pred) && !is.null(locs_pred)) {
+    A_pred <- as(INLA::inla.spde.make.A(mesh = mesh, loc = as.matrix(locs_pred)),
+                 "CsparseMatrix")
+    G <- nrow(X_pred)
+  } else {
+    A_pred <- NULL
+  }
+
+  # ---- Resume from checkpoint if one exists ----
+  # Checkpoint file is created by previous run of this sampler with the same
+  # checkpoint_path. The sampler state (current Gibbs values + accumulated
+  # draws + RNG state) is restored; we resume the loop at last_iter + 1.
+  # Static structures (mesh, spde, A, A_pred) are re-derived above.
+  start_iter <- 1L
+  resumed    <- FALSE
+  if (!is.null(checkpoint_path) && file.exists(checkpoint_path)) {
+    ck <- tryCatch(readRDS(checkpoint_path), error = function(e) NULL)
+    if (is.null(ck) || !identical(ck$kind, "bartsimp_pg_checkpoint")) {
+      message(sprintf("[checkpoint] file at %s is unreadable or wrong kind; ignoring",
+                      checkpoint_path))
+    } else if (ck$n_iter != n_iter || ck$burn != burn || ck$n_cl != n_cl) {
+      message(sprintf("[checkpoint] dims mismatch (n_iter %d/%d, burn %d/%d, n_cl %d/%d); ignoring",
+                      ck$n_iter, n_iter, ck$burn, burn, ck$n_cl, n_cl))
+    } else {
+      # Restore all named state into this function's environment.
+      for (nm in names(ck$state)) assign(nm, ck$state[[nm]], envir = environment())
+      if (!is.null(ck$rng_state))
+        assign(".Random.seed", ck$rng_state, envir = globalenv())
+      # binary_offset is a fixed scalar throughout the run; restore it from the
+      # checkpoint so the value is identical to the original run. Backwards
+      # compatible: pre-2026-06-07 checkpoints don't have this field.
+      if (!is.null(ck$binary_offset)) binary_offset <- ck$binary_offset
+      start_iter <- ck$last_iter + 1L
+      resumed    <- TRUE
+      message(sprintf("[checkpoint] resumed from %s (iter %d / %d, %.1f%%)",
+                      basename(checkpoint_path), ck$last_iter, n_iter,
+                      100 * ck$last_iter / n_iter))
+    }
+  }
+
+  if (!resumed) {
+    # ---- Fresh sampler init ----
+    # f_init = 0 (set above), trees initialised at 0 — they model deviations
+    # from the fixed binary_offset, not the absolute logit-prevalence.
+    ensemble <- ensemble_init(m_trees, init_val = f_init / m_trees)
+    z         <- rep(0, n_cl)
+    u_current <- rep(0, mesh$n)
+    sigma_m   <- init_sigma_m
+    rho       <- init_rho
+    f_current <- rep(f_init, n_cl)
+    var_probs <- if (use_dart) rep(1 / P, P) else NULL
+
+    sigma_m_draws <- numeric(n_iter)
+    rho_draws     <- numeric(n_iter)
+    f_draws       <- matrix(NA_real_, n_iter, n_cl)
+    z_draws       <- matrix(NA_real_, n_iter, n_cl)
+    u_draws       <- matrix(NA_real_, n_iter, mesh$n)
+    accept_psi    <- logical(n_iter)
+    var_probs_draws <- if (use_dart) matrix(NA_real_, n_iter, P) else NULL
+
+    # Logit-normal random-effects init (enable_re = FALSE → pass-through xi=0).
+    if (enable_re) {
+      xi              <- rep(0, n_cl)
+      sigma2_xi       <- init_sigma2_xi
+      xi_draws        <- matrix(NA_real_, n_iter, n_cl)
+      sigma2_xi_draws <- numeric(n_iter)
+    } else {
+      xi              <- rep(0, n_cl)
+      sigma2_xi       <- 0
+      xi_draws        <- NULL
+      sigma2_xi_draws <- NULL
+    }
+
+    # Adaptive psi MH (Robbins-Monro shared-scale, Andrieu-Thoms 2008).
+    log_c_psi       <- 0
+    log_c_psi_draws <- numeric(n_iter)
+
+    # Identifiability diagnostics
+    fz_cor_draws  <- numeric(n_iter)
+    varpart_draws <- matrix(NA_real_, n_iter, 3,
+                            dimnames = list(NULL, c("var_f", "var_z", "cov_fz")))
+
+    # Per-iteration BART ensemble snapshots (full posterior, no thinning).
+    if (save_post_ensembles) {
+      n_post <- n_iter - burn
+      ensemble_snapshots <- vector("list", n_post)
+    } else {
+      ensemble_snapshots <- NULL
+    }
+
+    # Grid-prediction draw matrices (A_pred itself was built above).
+    if (!is.null(A_pred)) {
+      eta_pred_draws <- matrix(NA_real_, n_iter, G)
+      f_pred_draws   <- matrix(NA_real_, n_iter, G)
+      z_pred_draws   <- matrix(NA_real_, n_iter, G)
+    } else {
+      eta_pred_draws <- NULL
+      f_pred_draws   <- NULL
+      z_pred_draws   <- NULL
+    }
+  }
+
+  # ---- Checkpoint writer (defined here so it captures the loop scope) ----
+  # Writes the current sampler state atomically to checkpoint_path. Called
+  # every `checkpoint_every_iter` iterations from the main loop.
+  write_checkpoint <- function(it) {
+    if (is.null(checkpoint_path)) return(invisible(FALSE))
+    state <- list(
+      ensemble = ensemble, z = z, u_current = u_current, f_current = f_current,
+      sigma_m = sigma_m, rho = rho, xi = xi, sigma2_xi = sigma2_xi,
+      var_probs = var_probs, log_c_psi = log_c_psi,
+      # History so far (filled 1:it; rows it+1:n_iter still NA / 0)
+      sigma_m_draws = sigma_m_draws, rho_draws = rho_draws,
+      f_draws = f_draws, z_draws = z_draws, u_draws = u_draws,
+      accept_psi = accept_psi, var_probs_draws = var_probs_draws,
+      xi_draws = xi_draws, sigma2_xi_draws = sigma2_xi_draws,
+      log_c_psi_draws = log_c_psi_draws,
+      fz_cor_draws = fz_cor_draws, varpart_draws = varpart_draws,
+      ensemble_snapshots = ensemble_snapshots,
+      eta_pred_draws = eta_pred_draws,
+      f_pred_draws = f_pred_draws, z_pred_draws = z_pred_draws
+    )
+    ck <- list(
+      kind = "bartsimp_pg_checkpoint",
+      version = 1L,
+      last_iter = it,
+      n_iter = n_iter, burn = burn, n_cl = n_cl,
+      enable_re = enable_re, use_dart = use_dart, bd_mode = bd_mode,
+      binary_offset = binary_offset,
+      state = state,
+      rng_state = if (exists(".Random.seed", envir = globalenv()))
+                    get(".Random.seed", envir = globalenv()) else NULL,
+      written_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
+    )
+    tmp <- paste0(checkpoint_path, ".tmp")
+    t_ck <- Sys.time()
+    saveRDS(ck, tmp, compress = "xz")
+    file.rename(tmp, checkpoint_path)
+    dt <- as.numeric(Sys.time() - t_ck, units = "secs")
+    sz_mb <- file.size(checkpoint_path) / 1024^2
+    message(sprintf("[checkpoint] iter %d/%d → %s (%.0f MB, %.0f sec)",
+                    it, n_iter, basename(checkpoint_path), sz_mb, dt))
+    invisible(TRUE)
+  }
+
+  t0 <- Sys.time()
+  for (it in seq.int(start_iter, n_iter)) {
+    # Linear predictor includes the fixed binary_offset (GLM-style intercept
+    # absorption, see dbarts binaryOffset). xi is constant zero unless
+    # enable_re is TRUE.
+    eta   <- binary_offset + f_current + z + xi
+    # BayesLogit::rpg silently returns zeros when h is integer-typed;
+    # force numeric to get correct PG draws.
+    Omega <- rpg(num = n_cl, h = as.numeric(n_i), z = eta)
+    ybar  <- (k_i - n_i / 2) / Omega
+
+    Q_psi  <- make_Qpsi(spde, sigma_m, rho)
+
+    if (bd_mode == "conditional") {
+      # BART target subtracts everything but f: (ybar - binary_offset - z - xi)
+      sw <- ensemble_sweep(ensemble, X,
+                           ybar - binary_offset - z - xi,
+                           Omega, tau2,
+                           alpha = alpha_bart, beta = beta_bart,
+                           var_probs = var_probs)
+    } else {
+      # Path A: BD MH uses marginal mlik (integrates mu_l AND z).
+      # enable_re path already short-circuited above; xi == 0 here so the
+      # original call is correct. Offset-correct the response before passing.
+      sw <- ensemble_sweep_marginal(ensemble, X,
+                                    ybar - binary_offset,
+                                    Omega, z, tau2,
+                                    A, Q_psi,
+                                    alpha = alpha_bart, beta = beta_bart,
+                                    var_probs = var_probs)
+    }
+    ensemble  <- sw$ensemble
+    f_current <- sw$fit
+
+    # GP target subtracts the offset, BART fit, and xi
+    yhat   <- ybar - binary_offset - f_current - xi
+    curr   <- margprob_woodbury(yhat, Omega, A, Q_psi)
+
+    # Apply the adaptive multiplier to both step sizes (frozen post-burn)
+    c_psi     <- exp(log_c_psi)
+    sigma_m_p <- exp(log(sigma_m) + rnorm(1, 0, sd_log_sigma * c_psi))
+    rho_p     <- exp(log(rho)     + rnorm(1, 0, sd_log_rho   * c_psi))
+    Q_psi_p   <- make_Qpsi(spde, sigma_m_p, rho_p)
+    prop      <- margprob_woodbury(yhat, Omega, A, Q_psi_p)
+    log_alpha <- (prop$mlik + log_pc_prior(rho_p, sigma_m_p)) -
+                 (curr$mlik + log_pc_prior(rho,   sigma_m))   +
+                 (log(sigma_m_p) + log(rho_p)) -
+                 (log(sigma_m)   + log(rho))
+    if (is.finite(log_alpha) && log(runif(1)) < log_alpha) {
+      sigma_m <- sigma_m_p; rho <- rho_p
+      accepted <- prop; accept_psi[it] <- TRUE
+    } else { accepted <- curr }
+
+    # Robbins-Monro update of log_c_psi (only during burn-in to keep ergodicity)
+    if (adapt_psi && it <= burn) {
+      gamma_t   <- (it + 1)^(-adapt_decay)
+      log_c_psi <- log_c_psi +
+                   gamma_t * (as.numeric(accept_psi[it]) - psi_target_acc)
+    }
+    log_c_psi_draws[it] <- log_c_psi
+
+    drawn <- if (is.null(C_mat))
+               draw_z_woodbury(accepted$m_u, accepted$Fchol, A)
+             else
+               draw_z_woodbury_rsr(accepted$m_u, accepted$Fchol, A, C_mat)
+    z          <- drawn$z
+    u_current  <- drawn$u
+
+    # ---- Logit-normal RE Gibbs steps ----
+    # See dev/beta_binomial_extension.md §5 (steps 4-5). xi_i and sigma2_xi
+    # both have closed-form Gaussian / Inv-Gamma full conditionals because
+    # the PG augmentation rendered the model conditionally Gaussian in
+    # (f, u, xi). The residual after offset+BART+GP is
+    # ybar - binary_offset - f - z = r_i.
+    if (enable_re) {
+      r        <- ybar - binary_offset - f_current - z
+      var_xi_i <- sigma2_xi / (1 + sigma2_xi * Omega)
+      mu_xi_i  <- var_xi_i * Omega * r
+      xi       <- rnorm(n_cl, mean = mu_xi_i, sd = sqrt(var_xi_i))
+
+      a_post    <- a_sigma + n_cl / 2
+      b_post    <- b_sigma + sum(xi^2) / 2
+      sigma2_xi <- 1 / rgamma(1, shape = a_post, rate = b_post)
+
+      xi_draws[it, ]      <- xi
+      sigma2_xi_draws[it] <- sigma2_xi
+    }
+
+    # DART update (Gibbs draw of variable-inclusion probabilities)
+    if (use_dart) {
+      var_probs <- update_var_probs_dart(ensemble, P, alpha_dart = alpha_dart)
+      var_probs_draws[it, ] <- var_probs
+    }
+
+    # Identifiability diagnostics
+    sd_f <- sd(f_current); sd_z <- sd(z)
+    fz_cor_draws[it] <- if (sd_f > 0 && sd_z > 0) cor(f_current, z) else 0
+    varpart_draws[it, "var_f"]  <- var(f_current)
+    varpart_draws[it, "var_z"]  <- var(z)
+    varpart_draws[it, "cov_fz"] <- cov(f_current, z)
+
+    sigma_m_draws[it] <- sigma_m
+    rho_draws[it]     <- rho
+    f_draws[it, ]     <- f_current
+    z_draws[it, ]     <- z
+    u_draws[it, ]     <- u_current
+
+    # Save the BART ensemble at every post-burn iteration. We deep-copy via
+    # rapply-style cloning so subsequent in-place tree mutations don't alter
+    # the saved snapshot. The trees in `ensemble` are R lists of atomic
+    # vectors, so this works automatically (R semantics).
+    if (save_post_ensembles && it > burn) {
+      ensemble_snapshots[[it - burn]] <- ensemble
+    }
+
+    # Per-iter grid predictions (after both BART and z were updated this sweep).
+    # eta_pred = binary_offset + f_pred + z_pred so downstream consumers can
+    # plug directly into plogis() without re-applying the offset.
+    if (!is.null(A_pred)) {
+      f_pred  <- ensemble_predict(ensemble, X_pred)
+      z_pred  <- as.numeric(A_pred %*% u_current)
+      f_pred_draws[it, ]   <- f_pred
+      z_pred_draws[it, ]   <- z_pred
+      eta_pred_draws[it, ] <- binary_offset + f_pred + z_pred
+    }
+
+    if (verbose_every > 0 && it %% verbose_every == 0) {
+      rmse_f <- if (!is.null(f_true)) sqrt(mean((f_current - f_true)^2)) else NA
+      cat(sprintf("  [%s] iter %4d  sigma_m=%.3f  rho=%.3f  RMSE(f)=%s  acc=%.2f  f_z_cor=%.2f\n",
+                  label, it, sigma_m, rho,
+                  if (is.na(rmse_f)) "NA" else sprintf("%.3f", rmse_f),
+                  mean(accept_psi[seq_len(it)]),
+                  fz_cor_draws[it]))
+    }
+
+    # Checkpoint every checkpoint_every_iter iterations (and never on the
+    # final iter — clean completion deletes the checkpoint instead).
+    if (!is.null(checkpoint_path) &&
+        checkpoint_every_iter > 0 &&
+        it %% checkpoint_every_iter == 0 &&
+        it < n_iter) {
+      write_checkpoint(it)
+    }
+  }
+  t1 <- Sys.time()
+
+  # ---- Loop completed cleanly — remove the in-flight checkpoint ----
+  # The final compact_storage + save happens in the caller; the checkpoint
+  # is no longer needed (it would in fact be stale wrt compaction).
+  if (!is.null(checkpoint_path) && file.exists(checkpoint_path)) {
+    unlink(checkpoint_path)
+    message(sprintf("[checkpoint] cleared %s on clean completion",
+                    basename(checkpoint_path)))
+  }
+
+  # ---- Storage compaction (lossless wrt prediction stages) ----
+  if (compact_storage) {
+    post_idx <- (burn + 1):n_iter
+    # 1) cluster-level f, z: keep only post-burn mean+sd summaries; the full
+    #    matrices are regenerable from ensemble_snapshots + u_draws + (X,A).
+    f_post_mean <- colMeans(f_draws[post_idx, , drop = FALSE])
+    f_post_sd   <- apply(f_draws[post_idx, , drop = FALSE], 2, sd)
+    z_post_mean <- colMeans(z_draws[post_idx, , drop = FALSE])
+    z_post_sd   <- apply(z_draws[post_idx, , drop = FALSE], 2, sd)
+    f_draws <- NULL
+    z_draws <- NULL
+
+    # 2) u_draws: drop burn-in rows; downstream only ever uses post-burn.
+    u_draws_full <- u_draws
+    u_draws <- u_draws_full[post_idx, , drop = FALSE]
+    rm(u_draws_full)
+
+    # 2b) xi_draws / sigma2_xi_draws: same treatment when enable_re.
+    if (enable_re) {
+      xi_draws        <- xi_draws[post_idx, , drop = FALSE]
+      sigma2_xi_draws <- sigma2_xi_draws[post_idx]
+    }
+
+    # 3) ensemble_snapshots trees: strip parent/depth (used only during fit,
+    #    not by ensemble_predict at prediction).
+    if (save_post_ensembles && !is.null(ensemble_snapshots)) {
+      keep_fields <- c("is_leaf", "split_var", "split_val",
+                       "left", "right", "mu")
+      ensemble_snapshots <- lapply(ensemble_snapshots, function(ens)
+        lapply(ens, function(tree) tree[keep_fields]))
+    }
+  } else {
+    f_post_mean <- NULL; f_post_sd <- NULL
+    z_post_mean <- NULL; z_post_sd <- NULL
+  }
+
+  list(
+    sigma_m_draws = sigma_m_draws, rho_draws = rho_draws,
+    f_draws = f_draws, z_draws = z_draws, u_draws = u_draws,
+    # When compact_storage = TRUE, f_draws / z_draws are NULL and you get
+    # these summaries instead:
+    f_post_mean = if (compact_storage) f_post_mean else NULL,
+    f_post_sd   = if (compact_storage) f_post_sd   else NULL,
+    z_post_mean = if (compact_storage) z_post_mean else NULL,
+    z_post_sd   = if (compact_storage) z_post_sd   else NULL,
+    compact_storage = compact_storage,
+    accept_psi = accept_psi,
+    fz_cor_draws = fz_cor_draws, varpart_draws = varpart_draws,
+    var_probs_draws = var_probs_draws,
+    mesh = mesh, spde = spde, A = A, ensemble_final = ensemble,
+    ensemble_snapshots = ensemble_snapshots,    # n_post list of BART ensembles
+    use_dart = use_dart, alpha_dart = alpha_dart,
+    bd_mode  = bd_mode,
+    # GLM-style fixed offset on the latent scale. Downstream prediction code
+    # must include this in eta = binary_offset + f(x) + z(s) [+ xi]. Older
+    # posteriors (pre-2026-06-07) won't have this field; consumers should
+    # default to 0 for backward compatibility.
+    binary_offset = binary_offset,
+    rsr_basis = if (is.null(B0_mat)) NULL else B0_mat,
+    # Logit-normal random-effects extension (NULL if enable_re = FALSE)
+    enable_re        = enable_re,
+    xi_draws         = xi_draws,
+    sigma2_xi_draws  = sigma2_xi_draws,
+    a_sigma          = a_sigma,
+    b_sigma          = b_sigma,
+    eta_pred_draws = eta_pred_draws,
+    f_pred_draws   = f_pred_draws,
+    z_pred_draws   = z_pred_draws,
+    log_c_psi_draws = log_c_psi_draws,
+    adapt_psi       = adapt_psi,
+    psi_target_acc  = psi_target_acc,
+    elapsed_sec = as.numeric(difftime(t1, t0, units = "secs")),
+    n_iter = n_iter, burn = burn,
+    label = label
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Posterior summary for a single MCMC fit, given truth
+# -----------------------------------------------------------------------------
+summarize_fit <- function(fit, f_true = NULL, z_true = NULL, eta_true = NULL,
+                          sigma_m_true = NA, rho_true = NA) {
+  keep <- (fit$burn + 1):fit$n_iter
+  sm   <- fit$sigma_m_draws[keep]
+  rh   <- fit$rho_draws[keep]
+  f_p  <- colMeans(fit$f_draws[keep, , drop = FALSE])
+  z_p  <- colMeans(fit$z_draws[keep, , drop = FALSE])
+
+  out <- list(
+    sigma_m_mean  = mean(sm),
+    sigma_m_q025  = quantile(sm, 0.025),
+    sigma_m_q975  = quantile(sm, 0.975),
+    sigma_m_covered = if (!is.na(sigma_m_true))
+        (sigma_m_true >= quantile(sm, 0.025) & sigma_m_true <= quantile(sm, 0.975))
+        else NA,
+    rho_mean      = mean(rh),
+    rho_q025      = quantile(rh, 0.025),
+    rho_q975      = quantile(rh, 0.975),
+    rho_covered   = if (!is.na(rho_true))
+        (rho_true >= quantile(rh, 0.025) & rho_true <= quantile(rh, 0.975))
+        else NA,
+    f_post        = f_p,
+    z_post        = z_p,
+    psi_acc       = mean(fit$accept_psi),
+    elapsed_sec   = fit$elapsed_sec
+  )
+  if (!is.null(f_true))   out$f_rmse   <- sqrt(mean((f_p - f_true)^2))
+  if (!is.null(z_true))   out$z_rmse   <- sqrt(mean((z_p - z_true)^2))
+  if (!is.null(eta_true)) out$eta_cor  <- cor(eta_true, f_p + z_p)
+  out
+}

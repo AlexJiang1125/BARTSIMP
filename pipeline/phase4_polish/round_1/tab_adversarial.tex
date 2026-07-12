@@ -1,0 +1,33 @@
+% tab_adversarial.tex --- spatial-amplitude (adversarial) sweep, legacy vs SD.
+% Numbers from data/dgp5_adversarial_aggregated.csv (Phase-2 validated, 12 reps/cell).
+\begin{table}[t]
+\centering
+\small
+\caption{Adversarial spatial-amplitude sweep ($\sigma_{gp}\in\{0.5,1.0,1.5\}$,
+12 reps/cell, $A=20$). In the BART-dominated regime ($\sigma_{gp}=0.5$), where the
+coarse-mean center bias lives, the floor moves $\cov_{80}$ \emph{up} toward nominal;
+in the GP-dominated regimes, where legacy already over-covers, it moves $\cov_{80}$
+gently \emph{down} toward nominal (anomaly~A3). The floor recenters toward $0.80$
+from \emph{both} sides---calibration, not monotone inflation---and is near-inert
+where the bias is absent. Monte-Carlo SE in parentheses.}
+\label{tab:adversarial}
+\begin{tabular}{c l rr r r}
+\toprule
+$\sigma_{gp}$ & Arm & Admin-1 $\cov_{80}$ & Admin-1 $\cov_{95}$ & $\ratio$ & pixel $\cov_{80}$ \\
+\midrule
+\multirow{2}{*}{$0.5$} & legacy ($\dz{=}0$) & $0.782\;(0.022)$ & $0.937$ & $0.991$ & $0.866$ \\
+                       & \bartsimpsd{}      & $0.816\;(0.024)$ & $0.925$ & $0.984$ & $0.864$ \\
+\midrule
+\multirow{2}{*}{$1.0$} & legacy ($\dz{=}0$) & $0.820\;(0.032)$ & $0.929$ & $0.947$ & $0.860$ \\
+                       & \bartsimpsd{}      & $0.812\;(0.030)$ & $0.946$ & $0.942$ & $0.872$ \\
+\midrule
+\multirow{2}{*}{$1.5$} & legacy ($\dz{=}0$) & $0.821\;(0.037)$ & $0.933$ & $0.952$ & $0.864$ \\
+                       & \bartsimpsd{}      & $0.804\;(0.033)$ & $0.921$ & $0.939$ & $0.871$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+{\footnotesize The sign of $\Delta\cov_{80}$ flips with $\sigma_{gp}$: $+0.034$
+($0.5$), $-0.008$ ($1.0$), $-0.017$ ($1.5$). Both directions move toward nominal
+$0.80$, confirming recentering rather than inflation.}
+\end{table}

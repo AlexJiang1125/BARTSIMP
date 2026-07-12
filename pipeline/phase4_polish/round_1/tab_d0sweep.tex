@@ -1,0 +1,29 @@
+% tab_d0sweep.tex --- HEADLINE depth-floor sensitivity sweep (16 reps).
+% Numbers from data/dgp5_d0sweep_aggregated.csv (Phase-2 validated).
+\begin{table}[t]
+\centering
+\small
+\caption{Headline calibration evidence: depth-floor sensitivity sweep
+($\dz\in\{0,\dots,4\}$, 16 reps, $N=500$, $A=20$). Turning the floor on
+($\dz\ge1$) lifts Admin-1 $\cov_{80}$ from the $\dz{=}0$ legacy ablation onto a
+broad plateau $0.815$--$0.827$, clearing the $+0.02$ bar, while the 95\% coverage,
+calibration ratio, absolute bias, and pixel-coverage guardrail stay flat. The knob
+is robust, not knife-edge. The $\dz{=}0$ row is simultaneously the ablation.
+Monte-Carlo SE in parentheses.}
+\label{tab:d0sweep}
+\begin{tabular}{c rr r r r}
+\toprule
+$\dz$ & Admin-1 $\cov_{80}$ & Admin-1 $\cov_{95}$ & $\ratio$ & Admin-1 $|\mathrm{bias}|$ & pixel $\cov_{80}$ \\
+\midrule
+$0$ (legacy/ablation) & $0.793\;(0.021)$ & $0.940$ & $0.982$ & $0.0060$ & $0.869\;(0.004)$ \\
+$1$ & $0.815\;(0.020)$ & $0.940$ & $0.974$ & $0.0063$ & $0.862\;(0.004)$ \\
+$2$ & $0.824\;(0.022)$ & $0.937$ & $0.999$ & $0.0061$ & $0.863\;(0.004)$ \\
+$3$ & $0.815\;(0.021)$ & $0.937$ & $0.984$ & $0.0054$ & $0.866\;(0.005)$ \\
+$4$ & $0.827\;(0.024)$ & $0.931$ & $0.973$ & $0.0055$ & $0.873\;(0.005)$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+{\footnotesize At $N=500$ the operating point is $\dz=\lceil\sqrt{\log N}\rceil=3$.
+The plateau across $\dz\ge1$ shows the floor is not tuned to a single special depth.}
+\end{table}

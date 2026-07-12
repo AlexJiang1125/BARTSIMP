@@ -1,0 +1,162 @@
+
+
+\documentclass[12pt]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{setspace}
+
+\definecolor{darkblue}{RGB}{0,0,139}
+% --- Page and spacing setup ---
+\geometry{margin=1in}
+\onehalfspacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+% --- Title information ---
+\title{Response to Reviewer's Comments}
+%\author{Your Name \\ Department or Course \\ University Name}
+\date{\today}
+
+% --- Document Starts ---
+\begin{document}
+
+\maketitle
+\newpage
+
+
+\section*{Review 1 Comments}
+
+{\it Reviewer $\#1$:~The paper sets up Bayesian inference for a mv Hawkes process with a BNP prior on the excitation function. The latter is written as a mixture of beta model with a hierarchically structured prior on the mixing measure, which allows for part of the mixing measure to be shared by all (cross-)dimensions, and the other part being specific to each dimension.
+THe paper introduces GIbbs sampler MCMC posterior inference and an alternative variational Bayes (VI) implementation. Both use latent indicators that identify immigrant and descendant events. The VI uses a mean field variational family, i.e., independence across all parameters.
+
+The main methodological novely is perhaps the prior model for the excitation function. At first glance it is not obvious why one needs the additional mixture. THere seems no urgent need to ensure a continuous excitation function, and one could as well directly put the hierarchical BNP prior on the excitation functions themselves?}
+
+
+\begin{enumerate}
+    \item {\it aaa}
+\end{enumerate}
+\clearpage
+% --- Section: Results ---
+\section*{Review 2 Comments}
+
+{\it Reviewer $\#2$:~In this paper, BARTSIMP is proposed, which combines the flexibility of Bayesian additive regression trees with spatial modeling using INLA. The paper is well written and the proposal is interesting. I do think however that it could benefit from some changes or clarifications:}
+
+\begin{enumerate}
+    \item {\it The data application is a good illustration of the proposed methodology, though there are some points unclear to me:}
+\begin{itemize}
+    \item {\it While you mention that interest is in providing prediction at various administrative levels, and in section 6.2 you mention that calculation are done at Admin 1 and Admin 2 levels, you do provide only results at admin 1 level (Fig 3 and 4)? Could you also provide the results at admin 2 level?}\\
+
+    {\color{darkblue} Thanks for pointing out, this is indeed a very good point. We now include figures for Admin 2 results in the Supplementary Materials (to save on space in the main paper). Figures 4 and 5 in the Supplementary Materials, Section 3 show maps, at Admin 2 level, of the posterior medians and 95\% credible interval lengths for the four methods: BARTSIMP, BART, SPDE and SPDE0. The results are similar to the results for Admin 1 areas, where the point predictions are similar across different methods, while BARTSIMP has larger  interval lengths than the other methods. Figures 6 to 11 give lineplots of the posterior median and 95\% credible intervals for all 290 Admin 2 enumeration areas. Note that we have split the graphs into six sub-graphs due to the amount of Admin 2 areas under consideration.} \\
+
+    
+    \item {\it It would be useful to provide a summary of the variables, such as the range. In Figure 5, I did not understand how to interpret the values on the x-axis. Are the variables scaled in some way?}\\
+
+    {\color{darkblue} Thanks for mentioning this. A summary of the geospatial covariates is shown in Table 1. To provide further context on the geospatial covariates we use for the application, we have included an extended version of Table 1 in the main paper, labeled Table 1 in the Supplementary Materials, Section 4. Specifically, we include the original range of all six covariates, the transformations we applied to the data, and the transformed range of the covariates. Additionally, we have included a sentence in Page 4 (highlighted in blue) to refer interested readers to the extended table.}\\
+
+    {\color{darkblue} We have also re-generated the partial dependence graphs, under more posterior samples (2000 samples after a burn-in period of 2000), under the original covariate scales. The regenerated figure is shown in Figure 7. Note that due to the log-transformation we applied to a few of the covariates, the partial dependence plots on some of the covariates are gridded unevenly. We also included an alternative version of the partial dependence plots in Figure 12, Supplementary Materials Section 5, with $x$ on the transformed scale.
+    }\\
+
+    \item {\it In Figure 5, you mention results of BARTSIMP and BART, though there are more lines provided in the Figure. This needs to be clarified. In addition, can these partial dependence plot in some way be compared to the covariate effects from the INLA model?}\\
+
+    {\color{darkblue} Thanks for  this comment. To avoid confusion on the graph, we only include results for BART and BARTSIMP models in the partial dependence plots in Figure 7. We see that these two models have similar results in terms of covariate effect estimation. To compare the results to the spatial models, we included a table of posterior summary of the fixed effects in the SPDE model we fitted for the WHZ dataset in Table 5, in Section 6 of the Supplementary Materials. Note that in the table, population density shows a positive association, while covariates including access to nearest city, and average temperature show a negative association. This matches with the results in the partial dependence plot (see Figure 7 in Section 6 of the main paper). 
+    }\\
+    
+    \item {\it It is not clear to me whether the available locations are the locations of the enumeration areas or of the households. When you refer to ``clusters", are these the households or rather the enumeration areas? In addition, given the two-stage cluster design, I would think it is important to account for both the spatial clustering (locations) and clustering within households. Could the method easily account for an extra random intercept to account for within-household correlation? I do not expect this to be done by the authors, but a discussion about this would be useful.}\\
+
+{\color{darkblue} We have clarified this in in the text as, ``All household in a cluster (enumeration areas) are assigned the same geographical location.".
+
+ It is a fair point, that there could be clustering in the households. We have mentioned this in the section on the applied example (see the end of Section 6.1 in the main paper), ``While it is theoretically straightforward to include an additional random household effect to account for dependence on observations in the same household, when we have attempted this in other projects with DHS data, there were identifiability issues, since it was hard to disentangle household and cluster effects".}\\
+
+    
+    \item {\it The sentence at end of Section 2 starting with ``There are higher levels, …" is not clear. Consider rephrasing.}\\
+
+    {\color{darkblue} Thanks for pointing out. Our intention was to highlight that the direct estimation method produces imprecise estimates. We have rephrased the sentence to, ``In the right panel, we see that the accompanying uncertainty measures are wide, so that the direct estimates are producing imprecise estimates, especially within the areas in the northwest region, making it difficult to interpret the direct estimates."}\\
+    
+\end{itemize}
+\item {\it The combination of BART with INLA seems a good proposal, showing how spatial association can be integrated in regression trees.}\\
+\begin{itemize}
+    \item {\it Section 3.2 gives an introduction to the BART model. However, to understand the function $g(x;T,\mu)$ that is used at a later stage, some more information is needed to understand the function (which is important to also understand the next steps in the paper).}\\
+
+    {\color{darkblue} Thanks for this suggestion. To make the flow of this section more coherent, we have now adjusted the order of the subsections. Especially, we now introduce the BART prior first (in Section 3.2), and then we introduce our sampling model for BARTSIMP in Section 3.3. Please refer to the highlighted texts. \\
+    }
+    
+    
+    \item {\it Section 4.1--4.3 give all the details on the algorithm. While useful to have all the details, the mathematical details could go to an appendix, while the steps are briefly explained in the paper. With the focus on how the updates in BARTSIMP are different from BART.}\\
+
+    {\color{darkblue} Thanks for the suggestion. We have now moved the details of the algorithm to the Supplementary Materials, Section 7. We have also added the following sentence at the start of Section 4: `` For the standard BART model, an efficient Gibbs-type sampler is available under conjugate priors on the model parameters \citep{chipman1998bayesian}. However, the computation faces scalability challenges once the spatial random effect component is added into the model.''}\\
+    
+\end{itemize}
+\item {\it The simulation clearly shows the benefits of the proposal, at least for the considered setting. The assumed scenario can indeed not be captured by the INLA models. To strengthen the results, I would like to see a broader simulation study with the following extensions:}
+\begin{itemize}
+    \item {\it Include an INLA model with eg a RW process on the covariate. This is standard use, and therefore worth to compare with.}\\
+
+      %  We have added:...\\
+        
+    \item {\it Include a scenario where you have a spatial effect together with linear covariates. In this case, INLA should be working well. Is BARTSIMP performing equally well, outperforming, or is there a price to pay for its flexibility?}\\
+
+      % We have added:...\\
+       
+    \item {\it Include a scenario where you have a spatial effect together with a smooth covariate. In this case, INLA with linear covariates will not work well, though with the inclusion of the covariate as e.g. a RW process should work well. Again, what is the performance of BARTSIMP with INLA in such a scenario?}\\
+
+
+    %(one dimensional case)
+\end{itemize}
+{
+\color{darkblue}
+Thanks for the suggestions on the simulation study. We will address these three points together. In addition to the current simulated covariate surface structure \textbf{(Tree-structured)}, we added two extra scenarios for the covariate surface, including one where the covariate surface is a linear combination of the two covariates \textbf{(Linear)} and one where the covariate surface is a smooth function (sine and cosine functions) of the two covariates \textbf{(Smooth)}. We have also included another alternative model \textbf{(SPDE-RW)} where we have a GMRF spatial model with Mat\'ern covariance function fitted by the SPDE approach, including all covariates with first-ordered random walk processes on them. The simulation results are shown in Figure 13 and 14 in Supplementary Materials, Section 8. We note that the BART, BARTSIMP and BARTSIMP-exact still perform very similarly compared to the tree-structured case, where better prediction performances are associated with stronger covariate signals. For the case where the covariate surface is generated from a linear model, SPDE and SPDE-RW consistently outperform other methods in terms of most prediction metrics. This is not surprising, as the linear covariate effect can be correctly specified by these methods (however, note that all three BART-related methods have very similar RMSE when only the covariate signal is present in the data). As the model does not include covariate effects, SPDE0 performs worse than other methods when the covariate signal is strong, but has better performance as the spatial signal increases. 
+
+When the covariate surface is generated from a smooth model, only SPDE-RW outperforms the other methods, as the smooth function cannot be correctly specified by models including SPDE. Note that BARTSIMP (and BARTSIMP-exact) still attain similar prediction performance when the covariate signal is relatively strong. 
+}
+
+
+\item {\it No mention was made about convergence checks of the proposed sampler. Can you show that 2000+2000 samples are indeed sufficient?}\\
+
+{
+\color{darkblue} Thanks for pointing this out. We have implemented convergence checks of the sampler, based on the results of the simulation studies. The results are now presented in Supplementary Materials, Section 8, where we look at the posterior convergence for the following quantities:
+
+\begin{itemize}
+    \item $\sigma_m^2, \sigma_e^2$ and $\kappa$: the spatial hyperparameters
+    \item $\sum_{j=1}^m g(\boldsymbol{x}_{i} ; \mathbf{T}_j, \boldsymbol{\mu}_j), i \in \{400, 500, 750\}$: the fitted covariate values for the 400, 500 and 750-th row in the dataset. We refer to them as `location 1',  `location 2' and `location 3'. 
+\end{itemize}
+
+Table 6 in Supplementary Materials, Section 9 shows the efficient sample sizes of the quantities of interest, averaged over 10 datasets for each scenario, obtained from 2000 posterior samples. Each row represents a different scenario (1-5 for `tree structured', 6-10 for `linear' and 11-15 for `smooth'). Additionally, we generated line plots for the six quantites from three individual datasets, shown in Figures 12 to 15 in Supplementary Materials, Section 9. \\
+Finally, we added a sentence ``We also conducted convergence analyses on the posterior samples from the simulation studies, with results shown in Supplementary Materials, Section 9.'' at the end of the Section 5 in the main paper.
+}
+
+\item {\it I would like to see computation times for the different methods. How much longer does the exact method take as compared to the proposed tool? How does computation time compare to the INLA method? Give computation times for the different methods for both the simulations as well as data analysis.}\\
+
+{
+\color{darkblue}
+
+Thanks for the suggestion. We have included an extra section (Please see Section 10 in the Supplemental Materials) that tabulates the computation times for both simulation and application results. Note that BARTSIMP takes longer time than BARTSIMP-exact, but this should not be surprising, as we illustrate through a computation comparison simulation study between BARTSIMP and BARTSIMP-exact in Section 10 of the Supplemental Materials (see more in the bullet point below).
+}
+
+\item {\it No details are provided on the exact version of BART-SIMP. This could be included as an appendix.}\\
+
+{
+\color{darkblue}
+
+We have now included an extra section (Section 11 in the Supplemental Materials) that describes the algorithm that directly evaluates the likelihood. We have also included a simulation study where we compare the computational times of BARTSIMP and BARTSIMP-exact under different number of observations in the dataset, to show that the BARTSIMP method scales better to large datasets. \\
+}
+
+\end{enumerate}
+
+
+
+% --- References ---
+%\newpage
+\bibliographystyle{apalike}
+\bibliography{main}
+
+\end{document}
+

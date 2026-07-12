@@ -1,0 +1,210 @@
+PAIRED dgp5: N=500 A=20 reps=24 d0(SD)=3 methods=GLM,GLMM-iCAR,GLMM-SPDE,Vanilla-BART,BARTSIMP-PG,BARTSIMP-PG-SD
+  [] iter  200  sigma_m=0.378  rho=0.517  RMSE(f)=NA  acc=0.23  f_z_cor=-0.04
+  [] iter  400  sigma_m=0.520  rho=0.412  RMSE(f)=NA  acc=0.26  f_z_cor=-0.05
+  [] iter  600  sigma_m=0.548  rho=0.407  RMSE(f)=NA  acc=0.25  f_z_cor=-0.09
+  [] iter  200  sigma_m=0.453  rho=1.056  RMSE(f)=NA  acc=0.27  f_z_cor=-0.09
+  [] iter  400  sigma_m=0.708  rho=1.731  RMSE(f)=NA  acc=0.23  f_z_cor=-0.04
+  [] iter  600  sigma_m=0.313  rho=0.526  RMSE(f)=NA  acc=0.24  f_z_cor=-0.09
+[rep  1/24] legacy cov80=0.70 bias=+0.0095 | SD cov80=0.75 bias=+0.0108
+  [] iter  200  sigma_m=0.999  rho=2.765  RMSE(f)=NA  acc=0.28  f_z_cor=0.02
+  [] iter  400  sigma_m=0.530  rho=0.666  RMSE(f)=NA  acc=0.25  f_z_cor=0.07
+  [] iter  600  sigma_m=0.315  rho=0.721  RMSE(f)=NA  acc=0.23  f_z_cor=0.04
+  [] iter  200  sigma_m=0.568  rho=0.783  RMSE(f)=NA  acc=0.26  f_z_cor=-0.01
+  [] iter  400  sigma_m=0.247  rho=0.456  RMSE(f)=NA  acc=0.25  f_z_cor=0.05
+  [] iter  600  sigma_m=0.268  rho=0.384  RMSE(f)=NA  acc=0.25  f_z_cor=0.01
+[rep  2/24] legacy cov80=0.75 bias=-0.0133 | SD cov80=0.80 bias=-0.0131
+  [] iter  200  sigma_m=0.547  rho=0.912  RMSE(f)=NA  acc=0.28  f_z_cor=0.00
+  [] iter  400  sigma_m=0.380  rho=0.421  RMSE(f)=NA  acc=0.24  f_z_cor=0.03
+  [] iter  600  sigma_m=0.309  rho=0.838  RMSE(f)=NA  acc=0.26  f_z_cor=0.07
+  [] iter  200  sigma_m=0.889  rho=1.382  RMSE(f)=NA  acc=0.28  f_z_cor=-0.01
+  [] iter  400  sigma_m=0.603  rho=0.638  RMSE(f)=NA  acc=0.25  f_z_cor=-0.02
+  [] iter  600  sigma_m=0.462  rho=0.653  RMSE(f)=NA  acc=0.24  f_z_cor=0.02
+[rep  3/24] legacy cov80=0.70 bias=+0.0083 | SD cov80=0.70 bias=+0.0057
+  [] iter  200  sigma_m=0.802  rho=1.125  RMSE(f)=NA  acc=0.28  f_z_cor=0.01
+  [] iter  400  sigma_m=0.501  rho=0.503  RMSE(f)=NA  acc=0.29  f_z_cor=-0.06
+  [] iter  600  sigma_m=0.475  rho=0.385  RMSE(f)=NA  acc=0.29  f_z_cor=-0.02
+  [] iter  200  sigma_m=0.529  rho=0.583  RMSE(f)=NA  acc=0.27  f_z_cor=0.08
+  [] iter  400  sigma_m=0.288  rho=0.317  RMSE(f)=NA  acc=0.25  f_z_cor=0.04
+  [] iter  600  sigma_m=0.462  rho=0.573  RMSE(f)=NA  acc=0.21  f_z_cor=0.07
+[rep  4/24] legacy cov80=0.80 bias=-0.0028 | SD cov80=0.90 bias=-0.0008
+  [] iter  200  sigma_m=0.314  rho=0.637  RMSE(f)=NA  acc=0.31  f_z_cor=0.01
+  [] iter  400  sigma_m=0.559  rho=1.550  RMSE(f)=NA  acc=0.23  f_z_cor=-0.01
+  [] iter  600  sigma_m=0.387  rho=0.634  RMSE(f)=NA  acc=0.22  f_z_cor=0.04
+  [] iter  200  sigma_m=0.369  rho=0.935  RMSE(f)=NA  acc=0.23  f_z_cor=-0.02
+  [] iter  400  sigma_m=0.355  rho=1.611  RMSE(f)=NA  acc=0.27  f_z_cor=-0.06
+  [] iter  600  sigma_m=0.290  rho=0.480  RMSE(f)=NA  acc=0.28  f_z_cor=-0.00
+[rep  5/24] legacy cov80=0.95 bias=+0.0120 | SD cov80=0.95 bias=+0.0098
+  [] iter  200  sigma_m=0.362  rho=0.605  RMSE(f)=NA  acc=0.26  f_z_cor=0.03
+  [] iter  400  sigma_m=0.440  rho=0.498  RMSE(f)=NA  acc=0.26  f_z_cor=-0.13
+  [] iter  600  sigma_m=0.350  rho=1.028  RMSE(f)=NA  acc=0.28  f_z_cor=-0.06
+  [] iter  200  sigma_m=0.369  rho=0.649  RMSE(f)=NA  acc=0.24  f_z_cor=-0.07
+  [] iter  400  sigma_m=0.349  rho=0.472  RMSE(f)=NA  acc=0.30  f_z_cor=0.02
+  [] iter  600  sigma_m=0.363  rho=0.625  RMSE(f)=NA  acc=0.30  f_z_cor=-0.01
+[rep  6/24] legacy cov80=0.75 bias=+0.0058 | SD cov80=0.85 bias=+0.0075
+  [] iter  200  sigma_m=0.638  rho=1.290  RMSE(f)=NA  acc=0.24  f_z_cor=0.01
+  [] iter  400  sigma_m=0.769  rho=1.439  RMSE(f)=NA  acc=0.22  f_z_cor=0.08
+  [] iter  600  sigma_m=0.632  rho=2.716  RMSE(f)=NA  acc=0.22  f_z_cor=0.13
+  [] iter  200  sigma_m=0.621  rho=1.583  RMSE(f)=NA  acc=0.26  f_z_cor=0.03
+  [] iter  400  sigma_m=0.352  rho=0.540  RMSE(f)=NA  acc=0.25  f_z_cor=0.09
+  [] iter  600  sigma_m=0.493  rho=1.500  RMSE(f)=NA  acc=0.24  f_z_cor=0.07
+[rep  7/24] legacy cov80=0.75 bias=-0.0031 | SD cov80=0.80 bias=-0.0019
+  [] iter  200  sigma_m=0.353  rho=0.563  RMSE(f)=NA  acc=0.28  f_z_cor=0.02
+  [] iter  400  sigma_m=0.477  rho=0.571  RMSE(f)=NA  acc=0.23  f_z_cor=0.03
+  [] iter  600  sigma_m=0.337  rho=0.550  RMSE(f)=NA  acc=0.23  f_z_cor=-0.03
+  [] iter  200  sigma_m=0.643  rho=1.759  RMSE(f)=NA  acc=0.26  f_z_cor=0.00
+  [] iter  400  sigma_m=0.573  rho=0.918  RMSE(f)=NA  acc=0.28  f_z_cor=0.04
+  [] iter  600  sigma_m=0.558  rho=1.524  RMSE(f)=NA  acc=0.28  f_z_cor=0.04
+[rep  8/24] legacy cov80=0.70 bias=+0.0054 | SD cov80=0.70 bias=+0.0058
+  [] iter  200  sigma_m=0.676  rho=1.137  RMSE(f)=NA  acc=0.24  f_z_cor=0.02
+  [] iter  400  sigma_m=0.373  rho=1.121  RMSE(f)=NA  acc=0.25  f_z_cor=0.00
+  [] iter  600  sigma_m=0.347  rho=0.900  RMSE(f)=NA  acc=0.24  f_z_cor=-0.06
+  [] iter  200  sigma_m=0.309  rho=0.370  RMSE(f)=NA  acc=0.26  f_z_cor=-0.09
+  [] iter  400  sigma_m=0.412  rho=0.646  RMSE(f)=NA  acc=0.24  f_z_cor=-0.00
+  [] iter  600  sigma_m=0.492  rho=0.605  RMSE(f)=NA  acc=0.24  f_z_cor=0.02
+[rep  9/24] legacy cov80=0.79 bias=-0.0050 | SD cov80=0.74 bias=-0.0020
+  [] iter  200  sigma_m=0.449  rho=0.228  RMSE(f)=NA  acc=0.26  f_z_cor=0.06
+  [] iter  400  sigma_m=0.267  rho=1.048  RMSE(f)=NA  acc=0.23  f_z_cor=0.17
+  [] iter  600  sigma_m=0.697  rho=1.556  RMSE(f)=NA  acc=0.25  f_z_cor=0.06
+  [] iter  200  sigma_m=0.618  rho=1.077  RMSE(f)=NA  acc=0.26  f_z_cor=0.09
+  [] iter  400  sigma_m=0.569  rho=1.065  RMSE(f)=NA  acc=0.28  f_z_cor=0.04
+  [] iter  600  sigma_m=0.384  rho=0.610  RMSE(f)=NA  acc=0.28  f_z_cor=0.04
+[rep 10/24] legacy cov80=0.85 bias=-0.0029 | SD cov80=0.90 bias=-0.0009
+  [] iter  200  sigma_m=0.591  rho=0.893  RMSE(f)=NA  acc=0.20  f_z_cor=-0.03
+  [] iter  400  sigma_m=1.050  rho=3.281  RMSE(f)=NA  acc=0.26  f_z_cor=-0.04
+  [] iter  600  sigma_m=0.672  rho=1.035  RMSE(f)=NA  acc=0.29  f_z_cor=-0.01
+  [] iter  200  sigma_m=0.409  rho=0.379  RMSE(f)=NA  acc=0.22  f_z_cor=-0.03
+  [] iter  400  sigma_m=0.722  rho=1.249  RMSE(f)=NA  acc=0.27  f_z_cor=-0.08
+  [] iter  600  sigma_m=0.566  rho=1.254  RMSE(f)=NA  acc=0.25  f_z_cor=-0.06
+[rep 11/24] legacy cov80=0.85 bias=+0.0034 | SD cov80=0.85 bias=+0.0026
+  [] iter  200  sigma_m=0.524  rho=0.937  RMSE(f)=NA  acc=0.27  f_z_cor=-0.03
+  [] iter  400  sigma_m=0.283  rho=0.576  RMSE(f)=NA  acc=0.28  f_z_cor=-0.03
+  [] iter  600  sigma_m=0.490  rho=1.455  RMSE(f)=NA  acc=0.27  f_z_cor=-0.02
+  [] iter  200  sigma_m=0.556  rho=0.558  RMSE(f)=NA  acc=0.26  f_z_cor=-0.04
+  [] iter  400  sigma_m=0.320  rho=0.330  RMSE(f)=NA  acc=0.25  f_z_cor=0.01
+  [] iter  600  sigma_m=0.469  rho=2.352  RMSE(f)=NA  acc=0.28  f_z_cor=0.02
+[rep 12/24] legacy cov80=0.80 bias=-0.0016 | SD cov80=0.85 bias=-0.0003
+  [] iter  200  sigma_m=0.522  rho=0.834  RMSE(f)=NA  acc=0.26  f_z_cor=0.06
+  [] iter  400  sigma_m=1.130  rho=3.124  RMSE(f)=NA  acc=0.26  f_z_cor=0.03
+  [] iter  600  sigma_m=0.528  rho=1.058  RMSE(f)=NA  acc=0.27  f_z_cor=0.03
+  [] iter  200  sigma_m=0.408  rho=0.600  RMSE(f)=NA  acc=0.26  f_z_cor=0.08
+  [] iter  400  sigma_m=0.493  rho=0.677  RMSE(f)=NA  acc=0.25  f_z_cor=0.02
+  [] iter  600  sigma_m=0.457  rho=0.406  RMSE(f)=NA  acc=0.25  f_z_cor=-0.00
+[rep 13/24] legacy cov80=0.75 bias=-0.0137 | SD cov80=0.70 bias=-0.0141
+  [] iter  200  sigma_m=0.341  rho=0.422  RMSE(f)=NA  acc=0.26  f_z_cor=0.03
+  [] iter  400  sigma_m=0.341  rho=0.523  RMSE(f)=NA  acc=0.25  f_z_cor=-0.06
+  [] iter  600  sigma_m=0.465  rho=1.038  RMSE(f)=NA  acc=0.26  f_z_cor=-0.06
+  [] iter  200  sigma_m=0.319  rho=0.387  RMSE(f)=NA  acc=0.30  f_z_cor=0.01
+  [] iter  400  sigma_m=0.457  rho=0.785  RMSE(f)=NA  acc=0.27  f_z_cor=-0.05
+  [] iter  600  sigma_m=0.415  rho=1.225  RMSE(f)=NA  acc=0.26  f_z_cor=-0.02
+[rep 14/24] legacy cov80=0.90 bias=+0.0082 | SD cov80=0.85 bias=+0.0068
+  [] iter  200  sigma_m=1.165  rho=4.978  RMSE(f)=NA  acc=0.26  f_z_cor=0.01
+  [] iter  400  sigma_m=0.675  rho=1.137  RMSE(f)=NA  acc=0.23  f_z_cor=0.08
+  [] iter  600  sigma_m=0.356  rho=0.542  RMSE(f)=NA  acc=0.21  f_z_cor=0.03
+  [] iter  200  sigma_m=0.436  rho=1.761  RMSE(f)=NA  acc=0.27  f_z_cor=0.02
+  [] iter  400  sigma_m=0.517  rho=1.190  RMSE(f)=NA  acc=0.24  f_z_cor=-0.04
+  [] iter  600  sigma_m=0.666  rho=1.633  RMSE(f)=NA  acc=0.24  f_z_cor=0.01
+[rep 15/24] legacy cov80=0.70 bias=+0.0012 | SD cov80=0.75 bias=+0.0031
+  [] iter  200  sigma_m=0.513  rho=1.074  RMSE(f)=NA  acc=0.26  f_z_cor=0.03
+  [] iter  400  sigma_m=0.486  rho=0.504  RMSE(f)=NA  acc=0.22  f_z_cor=-0.01
+  [] iter  600  sigma_m=0.547  rho=0.764  RMSE(f)=NA  acc=0.20  f_z_cor=-0.04
+  [] iter  200  sigma_m=0.553  rho=0.590  RMSE(f)=NA  acc=0.23  f_z_cor=-0.05
+  [] iter  400  sigma_m=0.433  rho=0.463  RMSE(f)=NA  acc=0.23  f_z_cor=-0.02
+  [] iter  600  sigma_m=0.622  rho=0.931  RMSE(f)=NA  acc=0.28  f_z_cor=-0.02
+[rep 16/24] legacy cov80=0.95 bias=+0.0005 | SD cov80=0.95 bias=+0.0006
+  [] iter  200  sigma_m=0.630  rho=0.505  RMSE(f)=NA  acc=0.27  f_z_cor=-0.08
+  [] iter  400  sigma_m=0.432  rho=0.444  RMSE(f)=NA  acc=0.25  f_z_cor=0.05
+  [] iter  600  sigma_m=0.344  rho=1.104  RMSE(f)=NA  acc=0.24  f_z_cor=0.01
+  [] iter  200  sigma_m=0.589  rho=0.456  RMSE(f)=NA  acc=0.22  f_z_cor=0.05
+  [] iter  400  sigma_m=0.393  rho=0.282  RMSE(f)=NA  acc=0.26  f_z_cor=0.02
+  [] iter  600  sigma_m=0.508  rho=0.884  RMSE(f)=NA  acc=0.27  f_z_cor=0.12
+[rep 17/24] legacy cov80=0.65 bias=+0.0000 | SD cov80=0.70 bias=+0.0016
+  [] iter  200  sigma_m=0.527  rho=1.294  RMSE(f)=NA  acc=0.23  f_z_cor=-0.01
+  [] iter  400  sigma_m=0.401  rho=0.436  RMSE(f)=NA  acc=0.26  f_z_cor=-0.07
+  [] iter  600  sigma_m=0.449  rho=0.754  RMSE(f)=NA  acc=0.27  f_z_cor=0.01
+  [] iter  200  sigma_m=0.376  rho=0.696  RMSE(f)=NA  acc=0.27  f_z_cor=-0.06
+  [] iter  400  sigma_m=0.453  rho=0.530  RMSE(f)=NA  acc=0.28  f_z_cor=-0.01
+  [] iter  600  sigma_m=0.482  rho=0.658  RMSE(f)=NA  acc=0.29  f_z_cor=-0.03
+[rep 18/24] legacy cov80=0.80 bias=+0.0123 | SD cov80=0.75 bias=+0.0107
+  [] iter  200  sigma_m=0.330  rho=0.394  RMSE(f)=NA  acc=0.28  f_z_cor=-0.04
+  [] iter  400  sigma_m=0.326  rho=0.447  RMSE(f)=NA  acc=0.24  f_z_cor=-0.12
+  [] iter  600  sigma_m=0.329  rho=1.479  RMSE(f)=NA  acc=0.24  f_z_cor=0.00
+  [] iter  200  sigma_m=0.411  rho=0.557  RMSE(f)=NA  acc=0.27  f_z_cor=-0.10
+  [] iter  400  sigma_m=0.430  rho=0.426  RMSE(f)=NA  acc=0.23  f_z_cor=-0.07
+  [] iter  600  sigma_m=0.587  rho=1.053  RMSE(f)=NA  acc=0.22  f_z_cor=-0.10
+[rep 19/24] legacy cov80=0.90 bias=+0.0052 | SD cov80=0.85 bias=+0.0057
+  [] iter  200  sigma_m=0.538  rho=0.871  RMSE(f)=NA  acc=0.24  f_z_cor=-0.02
+  [] iter  400  sigma_m=0.158  rho=0.610  RMSE(f)=NA  acc=0.28  f_z_cor=0.02
+  [] iter  600  sigma_m=0.299  rho=0.689  RMSE(f)=NA  acc=0.30  f_z_cor=0.03
+  [] iter  200  sigma_m=0.607  rho=1.330  RMSE(f)=NA  acc=0.28  f_z_cor=-0.06
+  [] iter  400  sigma_m=0.397  rho=0.403  RMSE(f)=NA  acc=0.27  f_z_cor=0.00
+  [] iter  600  sigma_m=0.338  rho=0.689  RMSE(f)=NA  acc=0.28  f_z_cor=-0.02
+[rep 20/24] legacy cov80=0.65 bias=+0.0039 | SD cov80=0.65 bias=+0.0030
+  [] iter  200  sigma_m=0.452  rho=0.525  RMSE(f)=NA  acc=0.25  f_z_cor=-0.04
+  [] iter  400  sigma_m=0.680  rho=1.506  RMSE(f)=NA  acc=0.26  f_z_cor=-0.03
+  [] iter  600  sigma_m=0.560  rho=0.833  RMSE(f)=NA  acc=0.27  f_z_cor=-0.04
+  [] iter  200  sigma_m=0.563  rho=0.857  RMSE(f)=NA  acc=0.26  f_z_cor=-0.03
+  [] iter  400  sigma_m=0.300  rho=0.852  RMSE(f)=NA  acc=0.27  f_z_cor=-0.02
+  [] iter  600  sigma_m=0.311  rho=0.995  RMSE(f)=NA  acc=0.28  f_z_cor=-0.04
+[rep 21/24] legacy cov80=0.70 bias=+0.0008 | SD cov80=0.70 bias=+0.0029
+  [] iter  200  sigma_m=0.374  rho=0.368  RMSE(f)=NA  acc=0.28  f_z_cor=-0.03
+  [] iter  400  sigma_m=0.398  rho=1.989  RMSE(f)=NA  acc=0.26  f_z_cor=-0.04
+  [] iter  600  sigma_m=0.121  rho=0.607  RMSE(f)=NA  acc=0.24  f_z_cor=0.07
+  [] iter  200  sigma_m=0.285  rho=0.315  RMSE(f)=NA  acc=0.27  f_z_cor=0.02
+  [] iter  400  sigma_m=0.398  rho=1.137  RMSE(f)=NA  acc=0.23  f_z_cor=-0.06
+  [] iter  600  sigma_m=0.216  rho=0.825  RMSE(f)=NA  acc=0.23  f_z_cor=-0.05
+[rep 22/24] legacy cov80=0.85 bias=+0.0073 | SD cov80=0.80 bias=+0.0054
+  [] iter  200  sigma_m=0.278  rho=0.485  RMSE(f)=NA  acc=0.28  f_z_cor=-0.07
+  [] iter  400  sigma_m=0.500  rho=1.140  RMSE(f)=NA  acc=0.29  f_z_cor=0.01
+  [] iter  600  sigma_m=0.532  rho=0.525  RMSE(f)=NA  acc=0.27  f_z_cor=-0.00
+  [] iter  200  sigma_m=0.328  rho=0.489  RMSE(f)=NA  acc=0.24  f_z_cor=-0.02
+  [] iter  400  sigma_m=0.628  rho=1.305  RMSE(f)=NA  acc=0.28  f_z_cor=-0.02
+  [] iter  600  sigma_m=0.500  rho=1.033  RMSE(f)=NA  acc=0.28  f_z_cor=-0.05
+[rep 23/24] legacy cov80=0.50 bias=-0.0035 | SD cov80=0.60 bias=-0.0014
+  [] iter  200  sigma_m=0.510  rho=0.378  RMSE(f)=NA  acc=0.30  f_z_cor=-0.03
+  [] iter  400  sigma_m=0.420  rho=1.282  RMSE(f)=NA  acc=0.25  f_z_cor=0.05
+  [] iter  600  sigma_m=0.300  rho=0.786  RMSE(f)=NA  acc=0.26  f_z_cor=0.04
+  [] iter  200  sigma_m=0.266  rho=0.583  RMSE(f)=NA  acc=0.28  f_z_cor=0.04
+  [] iter  400  sigma_m=0.398  rho=0.856  RMSE(f)=NA  acc=0.28  f_z_cor=0.08
+  [] iter  600  sigma_m=0.218  rho=0.447  RMSE(f)=NA  acc=0.28  f_z_cor=0.06
+[rep 24/24] legacy cov80=0.55 bias=+0.0045 | SD cov80=0.55 bias=+0.0014
+
+==== AGGREGATED (admin cov80 / cov95 / ratio) ====
+         method        metric   value   mc_se n_rep
+    BARTSIMP-PG    admin_bias 0.00176 0.00139    24
+ BARTSIMP-PG-SD    admin_bias 0.00203 0.00126    24
+            GLM    admin_bias 0.00475 0.00165    24
+      GLMM-iCAR    admin_bias 0.00476 0.00165    24
+      GLMM-SPDE    admin_bias 0.00332 0.00148    24
+   Vanilla-BART    admin_bias 0.00528 0.00137    24
+    BARTSIMP-PG   admin_cov80 0.76206 0.02314    24
+ BARTSIMP-PG-SD   admin_cov80 0.77654 0.02131    24
+            GLM   admin_cov80 0.11480 0.01293    24
+      GLMM-iCAR   admin_cov80 0.72215 0.02419    24
+      GLMM-SPDE   admin_cov80 0.76195 0.01935    24
+   Vanilla-BART   admin_cov80 0.29211 0.01215    24
+    BARTSIMP-PG   admin_cov95 0.94353 0.00971    24
+ BARTSIMP-PG-SD   admin_cov95 0.94156 0.01028    24
+            GLM   admin_cov95 0.16897 0.01191    24
+      GLMM-iCAR   admin_cov95 0.90384 0.01595    24
+      GLMM-SPDE   admin_cov95 0.91864 0.01642    24
+   Vanilla-BART   admin_cov95 0.42796 0.01469    24
+    BARTSIMP-PG   admin_ratio 1.03581 0.04305    24
+ BARTSIMP-PG-SD   admin_ratio 1.03399 0.04313    24
+            GLM   admin_ratio 9.46546 0.22176    24
+      GLMM-iCAR   admin_ratio 1.36076 0.09583    24
+      GLMM-SPDE   admin_ratio 1.19706 0.06473    24
+   Vanilla-BART   admin_ratio 3.26468 0.06116    24
+    BARTSIMP-PG cluster_cov80 0.99983 0.00012    24
+ BARTSIMP-PG-SD cluster_cov80 0.99967 0.00016    24
+            GLM cluster_cov80 0.84108 0.00377    24
+      GLMM-iCAR cluster_cov80 0.87367 0.00360    24
+      GLMM-SPDE cluster_cov80 0.92475 0.00361    24
+   Vanilla-BART cluster_cov80 0.95808 0.00194    24
+
+==== PAIRED DELTAS (SD - legacy) ====
+               quantity    value   mc_se n_pair
+            delta_cov80  0.01447 0.01023     24
+         delta_abs_bias -0.00066 0.00033     24
+          delta_post_sd -0.00040 0.00014     24
+ frac_reps_bias_reduced  0.62500      NA     24
+     frac_reps_cov80_up  0.41667      NA     24

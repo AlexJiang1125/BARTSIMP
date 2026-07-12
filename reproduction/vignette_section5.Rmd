@@ -1,0 +1,249 @@
+---
+title: "Reproducing Section 5: BARTSIMP simulation experiments"
+author: "BARTSIMP reproduction materials"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Reproducing Section 5: BARTSIMP simulation experiments}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 3)
+```
+
+This vignette reproduces the simulation study in Section 5 of
+
+> Jiang, A. Z., & Wakefield, J. (2025). *BARTSIMP: Flexible spatial covariate
+> modeling and prediction using Bayesian Additive Regression Trees.* Spatial and
+> Spatio-temporal Epidemiology, **55**, 100757.
+> <https://doi.org/10.1016/j.sste.2025.100757>
+
+It compares **BARTSIMP** against three competitors on a gridded spatial surface
+and reports the paper's four performance criteria. Everything here runs on
+self-contained synthetic data --- no external downloads are required.
+
+# What Section 5 does
+
+The design (paper Section 5.1):
+
+* A `r "50 x 50"` grid over $[0,1]^2$ ($|G| = 2500$ cells).
+* Two covariates $x_1, x_2 \sim \mathrm{Unif}(0,1)$ per cell.
+* A baseline spatial field $z^\* \sim \mathrm{GRF}$ with a Matérn
+  ($\kappa = 2.5$, $\nu = 1$, $\sigma_m^2 = 0.5$) covariance.
+* A covariate surface $f_0(x)$: `tree`, `linear`, or `smooth`.
+* The **true field** blends the two:
+  $$ f(x_g) = (1 - \omega)\, z^\*_g + \omega\, f_0(x_g), \qquad
+     \omega \in \{1, 0.8, 0.5, 0.2, 0\}. $$
+  $\omega$ is the *covariate-signal share*: $\omega = 1$ is a pure covariate
+  surface, $\omega = 0$ is a pure spatial field.
+* 250 clusters are sampled (one location per chosen cell); each cluster has
+  $n_j \sim \mathrm{Unif}\{5,\dots,10\}$ noisy observations
+  $y_{ij} = f(\text{cell}_j) + N(0, \sigma_e^2 = 1)$.
+
+Every method is trained on the 250-cluster observations and asked to predict the
+noise-free field $f(x_g)$ at all 2500 grid cells.
+
+The methods (paper Section 5.1):
+
+| Method   | Covariate model | Spatial field | Fitted with        |
+|----------|-----------------|---------------|--------------------|
+| BARTSIMP | BART ensemble   | Matérn SPDE   | `BARTSIMP`         |
+| BART     | BART ensemble   | *none*        | `dbarts`           |
+| SPDE     | linear          | Matérn SPDE   | `INLA`             |
+| SPDE0    | intercept only  | Matérn SPDE   | `INLA`             |
+
+The performance criteria (paper Section 5.2), all averaged over $G$:
+
+* **RMSE** --- point-prediction accuracy.
+* **AIL** --- average $(1-\alpha)$ interval length.
+* **ACR** --- average coverage rate (nominal $1-\alpha = 0.95$).
+* **AIS** --- average interval score (Gneiting & Raftery, 2007); lower is better.
+
+# Setup
+
+```{r load, message=FALSE}
+library(BARTSIMP)
+if (requireNamespace("INLA", quietly = TRUE))
+  try(INLA::inla.setOption(fmesher.evolution.warn = FALSE), silent = TRUE)
+
+# The reproduction building blocks live in reproduction/R/. Sourcing the runner
+# pulls in the DGP, metrics, competitors, and the BARTSIMP fitter. `.repro_R`
+# tells the runner where those files are (knitr sets the working directory to
+# this .Rmd's folder, so "R" resolves to reproduction/R).
+.repro_R <- if (dir.exists("R")) normalizePath("R") else normalizePath("reproduction/R")
+source(file.path(.repro_R, "run_scenario.R"))
+```
+
+`dbarts` and `INLA` are needed for the competitors; `INLA` is also used inside
+BARTSIMP. See `reproduction/README.md` for installation notes.
+
+# One scenario, step by step
+
+We take a moderate mixed scenario ($\omega = 0.5$, `tree` surface). To keep the
+vignette fast we shrink the grid and the MCMC; the full paper settings are given
+in the last section.
+
+```{r simulate}
+set.seed(2025)
+sim  <- simulate_section5(omega = 0.5, surface = "tree",
+                          n_side = 20L, n_clusters = 120L, seed = 1L)
+obs  <- sim$obs      # per-observation training data
+grid <- sim$grid     # the |G|-cell surface incl. the target f_true
+c(grid_cells = nrow(grid), observations = nrow(obs),
+  clusters = length(unique(obs$cluster)))
+```
+
+The true field and the sampled clusters:
+
+```{r plot-field, fig.height=3.2}
+# grid is expand.grid(s1, s2) with s1 varying fastest, so f_true already fills a
+# (n_side x n_side) matrix column-major with rows = s1, columns = s2.
+u1 <- sort(unique(grid$s1)); u2 <- sort(unique(grid$s2))
+op <- par(mfrow = c(1, 2), mar = c(3, 3, 2, 1))
+image(u1, u2, matrix(grid$f_true, nrow = length(u1)),
+      main = "True field f(x_g)", xlab = "s1", ylab = "s2")
+plot(obs$s1, obs$s2, pch = 19, cex = 0.4, col = "#00000066",
+     main = "Sampled cluster locations", xlab = "s1", ylab = "s2")
+par(op)
+```
+
+## Fit the four methods
+
+```{r fit-all, message=FALSE, results="hide"}
+res_scenario <- run_scenario(
+  omega = 0.5, surface = "tree", seed = 1,
+  n_side = 20L, n_clusters = 120L,
+  bartsimp_args = list(ntree = 40L, ndpost = 150L, nwarmup = 150L, seed = 1L),
+  bart_args     = list(ntree = 40L, ndpost = 1000L, nskip = 1000L),
+  verbose = FALSE
+)
+```
+
+```{r show-scenario}
+knitr::kable(res_scenario[, c("method", "RMSE", "AIL", "ACR", "AIS")],
+             digits = 3, row.names = FALSE,
+             caption = "One replicate, omega = 0.5, tree surface.")
+```
+
+You should see the qualitative pattern from the paper: **BARTSIMP** attains the
+lowest RMSE and AIS because it captures *both* the covariate surface (via BART)
+and the residual spatial structure (via the Matérn field). BART alone recovers
+the covariate signal but under-covers (no spatial field); SPDE0 (spatial only)
+has the widest intervals and worst RMSE on a covariate-driven surface.
+
+# A small multi-scenario sweep
+
+`run_section5()` loops over $\omega$ values, surfaces, and replicate seeds. Here
+is a deliberately small sweep; raise `reps`, `n_side`, and the MCMC sizes toward
+the paper settings as your compute budget allows.
+
+```{r sweep, eval=FALSE}
+results <- run_section5(
+  omegas = c(1, 0.5, 0), surfaces = "tree", reps = 1:3,
+  n_side = 25L, n_clusters = 150L,
+  bartsimp_args = list(ntree = 40L, ndpost = 200L, nwarmup = 200L),
+  bart_args     = list(ntree = 40L, ndpost = 1000L, nskip = 1000L)
+)
+summarize_section5(results)   # scenario means, paper-table layout
+```
+
+The command-line driver does the same and writes CSVs to
+`reproduction/results/`:
+
+```sh
+Rscript reproduction/run_section5.R            # quick demo config
+Rscript reproduction/run_section5.R --paper    # full paper-scale sweep
+```
+
+# The fast spatial predictor (Woodbury)
+
+Stage 2 of BARTSIMP --- recovering the residual Matérn field for each posterior
+draw --- was the runtime bottleneck in the original code: it refit an INLA/SPDE
+model *per draw*. With the Matérn hyperparameters held fixed at each draw's
+$(\kappa, \sigma_m)$, that fit is exactly the posterior mean of a Gaussian
+Markov random field, which is available in closed form,
+
+$$ m_u = Q_u^{-1} A^\top \Omega\, r, \qquad
+   Q_u = A^\top \Omega A + Q_\psi(\kappa, \sigma_m), $$
+
+computed with a single sparse Cholesky. `BARTSIMP::bartsimp_predict()` exposes
+this as `method = "woodbury"`, which `fit_bartsimp()` uses by default here;
+`method = "inla"` restores the original per-draw INLA fit. The two are
+numerically equivalent --- only the cost differs.
+
+The chunk below isolates the predictor: it builds a mesh and a set of synthetic
+per-draw tree predictions, then runs both methods on identical inputs.
+
+```{r woodbury-demo, message=FALSE}
+set.seed(7)
+n_tr <- 150L; ndraw <- 10L
+s_tr <- data.frame(s1 = runif(n_tr), s2 = runif(n_tr))
+s_te <- expand.grid(s1 = seq(0.02, 0.98, length.out = 18),
+                    s2 = seq(0.02, 0.98, length.out = 18))
+s_te <- data.frame(s1 = s_te$s1, s2 = s_te$s2)
+mesh <- INLA::inla.mesh.2d(loc = as.matrix(s_tr),
+                           max.edge = c(0.1, 0.4), cutoff = 0.02)
+
+y_tr  <- rnorm(n_tr)
+td_tr <- matrix(rnorm(ndraw * n_tr),       nrow = ndraw)
+td_te <- matrix(rnorm(ndraw * nrow(s_te)), nrow = ndraw)
+kap   <- runif(ndraw, 1.5, 3.5)
+sgm   <- runif(ndraw, 0.4, 0.9)
+sob   <- runif(ndraw, 0.8, 1.2)
+
+pred_args <- list(y_train = y_tr, tree_draws_train = td_tr,
+                  tree_draws_test = td_te, s_train = s_tr, s_test = s_te,
+                  kappas = kap, sigmams = sgm, sigma_obs = sob, mesh = mesh)
+
+t_inla <- system.time(
+  p_inla <- do.call(BARTSIMP::bartsimp_predict,
+                    c(pred_args, method = "inla")))[["elapsed"]]
+t_wb <- system.time(
+  p_wb <- do.call(BARTSIMP::bartsimp_predict,
+                  c(pred_args, method = "woodbury")))[["elapsed"]]
+
+round(c(
+  max_abs_diff  = max(abs(p_inla$spatial_mean_test - p_wb$spatial_mean_test)),
+  correlation   = cor(c(p_inla$spatial_mean_test), c(p_wb$spatial_mean_test)),
+  inla_seconds  = t_inla,
+  woodbury_secs = t_wb,
+  speedup       = t_inla / t_wb), 4)
+```
+
+The two spatial means agree to floating-point tolerance while the Woodbury path
+is far cheaper, and the gap widens with `ndpost`, the mesh size, and the number
+of prediction points. For the paper-scale sweep this turns Stage-2 prediction
+from a dominant cost into a negligible one.
+
+# Reproducing the paper-scale results
+
+To match the paper exactly, use:
+
+* `n_side = 50` ($|G| = 2500$), `n_clusters = 250`, `obs_range = 5:10`,
+  `sigma2_e = 1`, Matérn `kappa = 2.5`, `nu = 1`, `sigma2_m = 0.5`.
+* All five $\omega \in \{1, 0.8, 0.5, 0.2, 0\}$ and all three surfaces.
+* BARTSIMP `ndpost = 1000`, `nwarmup = 1000`; BART `ndpost = nskip = 2000`.
+* At least 20 replicate seeds per scenario, averaged with `summarize_section5()`.
+
+**Runtime.** Stage-2 prediction now uses the Woodbury predictor by default (see
+the previous section), so it is cheap. The remaining cost is the C++ sampler
+(Stage 1), which still calls INLA once per MCMC iteration for the marginal
+likelihood and therefore dominates a paper-scale run: a full sweep is a
+multi-hour (to overnight) job.
+
+**Further speedups.** The marginal likelihood evaluated inside the sampler has
+the same closed-form Gaussian (Woodbury / sparse-Cholesky) structure and can
+likewise be computed without INLA. That sampler-side optimization is tracked
+separately in the developer notes; the `method = "woodbury"` predictor above is
+the part that is already wired into the package and the reproduction fitter.
+
+# Session information
+
+```{r session}
+sessionInfo()
+```

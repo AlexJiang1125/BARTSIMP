@@ -1,0 +1,275 @@
+---
+title: "Reproducing Section 6: BARTSIMP application (Kenya DHS child wasting)"
+author: "BARTSIMP reproduction materials"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Reproducing Section 6: BARTSIMP application (Kenya DHS child wasting)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 3.4)
+```
+
+This vignette reproduces the *application* in Section 6 of
+
+> Jiang, A. Z., & Wakefield, J. (2025). *BARTSIMP: Flexible spatial covariate
+> modeling and prediction using Bayesian Additive Regression Trees.* Spatial and
+> Spatio-temporal Epidemiology, **55**, 100757.
+> <https://doi.org/10.1016/j.sste.2025.100757>
+
+Section 6 fits BARTSIMP to child wasting (weight-for-height Z-score, **WHZ**)
+from the 2014 Kenya DHS with six geospatial covariates, and does three things:
+
+1. **Stratified cross-validation** that splits *clusters* (enumeration areas),
+   comparing BARTSIMP against BART / SPDE / SPDE0 on RMSE / AIL / ACR / AIS.
+2. **Population-weighted areal aggregation** of the point-level surface to
+   administrative areas, with credible intervals from the *areal* posterior.
+3. **Partial dependence** to read off each covariate's marginal effect on WHZ.
+
+> **Data note.** The DHS microdata are **not redistributable** --- you must
+> register with the DHS Program and download them yourself. So this vignette runs
+> on a **synthetic** Kenya-DHS-*like* dataset with the same structure (clusters,
+> strata, six named covariates, nested admin areas, under-five population
+> weights). It reproduces the *workflow*, not the paper's numbers.
+> `reproduction/R/covariates_kenya.R` documents exactly how to assemble the real
+> inputs; once you have them in the same column layout, every code chunk below
+> runs unchanged.
+
+# The Section 6 design
+
+| Element      | Paper (real Kenya DHS)                 | This vignette (synthetic) |
+|--------------|----------------------------------------|---------------------------|
+| Outcome      | WHZ, 2014 Kenya DHS children           | synthetic WHZ surface     |
+| Clusters     | 1584 enumeration areas                 | 200 sampled cells         |
+| Strata       | county x urban/rural (~92)             | admin1 x urban/rural      |
+| Areas        | Admin1 = 47 counties, Admin2 = 290     | 9 admin1 x 4 admin2       |
+| Covariates   | 6 geospatial rasters (below)           | 6 synthetic surfaces      |
+| Weight       | WorldPop under-five density            | synthetic `pop_u5`        |
+
+The six covariates (names match `SECTION6_COVARIATES`):
+
+| Name          | Meaning                    | Real source            |
+|---------------|----------------------------|------------------------|
+| `pop_density` | Population density         | WorldPop               |
+| `night_light` | Night-time lights          | NOAA VIIRS/DMSP        |
+| `ndvi`        | Vegetation index           | MODIS MOD13            |
+| `temp`        | Mean annual temperature    | WorldClim (bio1)       |
+| `precip`      | Annual precipitation       | WorldClim (bio12)      |
+| `access_city` | Travel time to city        | JRC / Malaria Atlas    |
+
+BARTSIMP models $y_{ik} = \mathrm{BART}(x_i) + z_i + \varepsilon_{ik}$, the same
+Gaussian sampling model as Section 5: a flexible covariate mean via BART plus a
+Matérn-SPDE spatial field $z$ and child-level noise $\varepsilon$.
+
+# Setup
+
+```{r load, message=FALSE}
+library(BARTSIMP)   # Depends: INLA, so this also attaches INLA (needed by the sampler)
+try(INLA::inla.setOption(fmesher.evolution.warn = FALSE), silent = TRUE)
+
+# Section 6 building blocks. Sourcing run_scenario.R pulls in metrics/
+# competitors/bartsimp_fit; Section 6 adds the DGP, areal helpers, and the CV
+# runner. `.repro_R` points at reproduction/R/ (knitr sets the wd to this file).
+.repro_R <- if (dir.exists("R")) normalizePath("R") else normalizePath("reproduction/R")
+source(file.path(.repro_R, "run_scenario.R"))
+source(file.path(.repro_R, "dgp_section6.R"))
+source(file.path(.repro_R, "areal.R"))
+source(file.path(.repro_R, "cv_section6.R"))
+```
+
+`dbarts` and `INLA` are needed for the competitors and for BARTSIMP itself. To
+work with the **real** data you would additionally load `covariates_kenya.R` and
+the geospatial packages it uses (`terra`, `sf`, `haven`); see that file's
+`kenya_data_sources()` for the download checklist.
+
+# A synthetic Kenya-DHS-like dataset
+
+```{r simulate}
+sim <- simulate_section6(n_side = 24L, n_clusters = 200L, obs_range = 15:25,
+                         n_admin1 = 9L, admin2_per = 4L, omega = 0.7,
+                         seed = 20260712L)
+obs      <- sim$obs        # one row per child
+grid     <- sim$grid       # prediction surface (has the synthetic truth f_true)
+clusters <- sim$clusters   # design/location table
+c(children = nrow(obs), clusters = nrow(clusters),
+  grid_cells = nrow(grid), strata = length(unique(clusters$stratum)),
+  admin1 = length(unique(grid$admin1)))
+```
+
+The true WHZ surface, the sampled clusters, and the admin-1 partition:
+
+```{r plot-surface, fig.height=3.2}
+u1 <- sort(unique(grid$s1)); u2 <- sort(unique(grid$s2))
+op <- par(mfrow = c(1, 3), mar = c(3, 3, 2, 1))
+image(u1, u2, matrix(grid$f_true, nrow = length(u1)),
+      main = "True WHZ surface", xlab = "s1", ylab = "s2")
+points(clusters$s1, clusters$s2, pch = 19, cex = 0.3, col = "#00000055")
+image(u1, u2, matrix(grid$pop_u5, nrow = length(u1)),
+      main = "Under-5 population weight", xlab = "s1", ylab = "s2")
+image(u1, u2, matrix(grid$admin1, nrow = length(u1)),
+      main = "Admin-1 areas", xlab = "s1", ylab = "s2")
+par(op)
+```
+
+# Analysis 1: stratified cluster cross-validation
+
+The paper splits **clusters** (not children) into train/test, preserving the
+stratified design (county x urban/rural). Splitting by cluster is essential:
+children in one cluster share a location, so a row-wise split would leak spatial
+information into the test set. We score each method against the held-out
+**cluster-mean WHZ** (averaging a cluster's test children removes most child-level
+noise, so the mean-field intervals returned by the fitters are the right object
+to score).
+
+```{r cv, message=FALSE, results="hide"}
+cv <- run_cv_section6(
+  sim, reps = 1:2, methods = c("BARTSIMP", "BART", "SPDE", "SPDE0"),
+  prop_train = 0.8, alpha = 0.05,
+  bartsimp_args = list(ntree = 30L, ndpost = 150L, nskip = 1L, nwarmup = 150L),
+  verbose = FALSE)
+```
+
+```{r cv-table}
+knitr::kable(summarize_cv_section6(cv)[, c("method", "RMSE", "AIL", "ACR", "AIS")],
+             digits = 3, row.names = FALSE,
+             caption = "Cluster CV, 2 repeats (means). Nominal coverage 0.95.")
+```
+
+Interpretation mirrors the paper: BARTSIMP is competitive on RMSE while keeping
+intervals honest, because it captures the covariate signal (BART) *and* the
+residual spatial structure (Matérn field). **These are tiny-run numbers** ---
+`ndpost = 150`, 2 repeats --- so coverage is not yet calibrated; raise the MCMC
+size and `reps` toward the paper settings (last section) before reading anything
+into the ranking.
+
+# Analysis 2: population-weighted areal estimates
+
+For small-area estimation the paper aggregates the point-level surface to
+administrative areas with an under-five **population-weighted** average,
+$$ \mathrm{WHZ}_R = \frac{\sum_{g \in R} \mathrm{WHZ}(s_g)\, d_5(s_g)}
+                        {\sum_{g \in R} d_5(s_g)}, $$
+and takes the area's credible interval from the **areal posterior** (apply the
+weighted average to every posterior draw, then take quantiles) --- *not* by
+combining cell-level intervals. `fit_bartsimp(..., return_draws = TRUE)` returns
+the full cell-level posterior for exactly this purpose.
+
+```{r areal-fit, message=FALSE, results="hide"}
+fit <- fit_bartsimp(obs, grid, cov_names = SECTION6_COVARIATES,
+                    ntree = 30L, ndpost = 250L, nskip = 1L, nwarmup = 250L,
+                    alpha = 0.05, return_draws = TRUE)
+bs_area  <- aggregate_areal(fit$draws, grid, level = "admin1", weight = "pop_u5")
+truth    <- true_areal(grid, level = "admin1", weight = "pop_u5")
+direct   <- direct_areal_estimate(obs, level = "admin1")
+```
+
+```{r areal-compare}
+cmp <- merge(truth, bs_area, by = "area")
+cmp <- merge(cmp, direct[, c("area", "point", "lower", "upper")],
+             by = "area", suffixes = c("_bs", "_direct"))
+rmse <- function(a, b) sqrt(mean((a - b)^2))
+cover <- function(lo, hi, t) mean(t >= lo & t <= hi)
+knitr::kable(
+  data.frame(
+    method   = c("BARTSIMP (areal posterior)", "Direct (cluster means)"),
+    RMSE     = c(rmse(cmp$point_bs, cmp$truth), rmse(cmp$point_direct, cmp$truth)),
+    coverage = c(cover(cmp$lower_bs, cmp$upper_bs, cmp$truth),
+                 cover(cmp$lower_direct, cmp$upper_direct, cmp$truth))),
+  digits = 3, row.names = FALSE,
+  caption = "Admin-1 WHZ vs synthetic truth: model-based areal vs direct.")
+```
+
+```{r areal-plot, fig.height=3.6}
+ord <- order(cmp$truth)
+op <- par(mar = c(4, 4, 2, 1))
+plot(cmp$truth[ord], type = "n", ylim = range(c(cmp$lower_bs, cmp$upper_bs,
+     cmp$lower_direct, cmp$upper_direct, cmp$truth)),
+     xlab = "admin-1 area (sorted by truth)", ylab = "WHZ",
+     main = "Areal WHZ: truth (black), BARTSIMP (blue), direct (red)")
+xs <- seq_along(ord)
+arrows(xs, cmp$lower_bs[ord], xs, cmp$upper_bs[ord], length = 0.02,
+       angle = 90, code = 3, col = "#1f6fbf")
+arrows(xs + 0.15, cmp$lower_direct[ord], xs + 0.15, cmp$upper_direct[ord],
+       length = 0.02, angle = 90, code = 3, col = "#c0392b")
+points(xs, cmp$point_bs[ord], pch = 19, col = "#1f6fbf")
+points(xs + 0.15, cmp$point_direct[ord], pch = 17, col = "#c0392b")
+points(xs, cmp$truth[ord], pch = 4, lwd = 2)
+par(op)
+```
+
+The model-based areal estimate borrows strength across space and covariates, so
+it typically tracks the truth far better than a direct estimate that uses only
+each area's own clusters --- the qualitative point of the paper's small-area
+maps. (Coverage again needs a larger MCMC run to calibrate.)
+
+# Analysis 3: partial dependence
+
+Partial dependence reads off the marginal effect of a covariate on WHZ, holding
+the others fixed --- the paper uses it to interpret the fitted covariate model.
+Here is a self-contained partial-dependence computation on the BART covariate
+mean (via `dbarts` with `keeptrees = TRUE`), which recovers the signs built into
+the synthetic covariate effect (WHZ rises with population density and
+precipitation, falls with temperature and travel time to a city).
+
+```{r pdp, message=FALSE, fig.height=3.4}
+set.seed(1)
+Xtr <- as.matrix(obs[, SECTION6_COVARIATES, drop = FALSE])
+bfit <- dbarts::bart(x.train = Xtr, y.train = obs$y, keeptrees = TRUE,
+                     ntree = 50L, ndpost = 400L, nskip = 400L, verbose = FALSE)
+
+partial_dependence <- function(fit, X, var, n_grid = 20L, n_bg = 250L) {
+  bg   <- X[sample(nrow(X), min(n_bg, nrow(X))), , drop = FALSE]
+  grid <- seq(quantile(X[, var], 0.05), quantile(X[, var], 0.95),
+              length.out = n_grid)
+  mm <- vapply(grid, function(g) {
+    nb <- bg; nb[, var] <- g
+    mean(colMeans(predict(fit, nb)))   # average over draws and background rows
+  }, numeric(1))
+  data.frame(x = grid, whz = mm)
+}
+
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+for (v in c("pop_density", "temp")) {
+  pd <- partial_dependence(bfit, Xtr, v)
+  plot(pd$x, pd$whz, type = "l", lwd = 2, col = "#1f6fbf",
+       xlab = v, ylab = "partial dependence (WHZ)",
+       main = paste("PDP:", v))
+}
+par(op)
+```
+
+Population density shows a positive partial effect and temperature a negative
+one, matching the data-generating `.covariate_effect()`. On real data these
+curves are the interpretive payoff of the flexible BART mean --- non-linearities
+that a linear SPDE covariate term would miss.
+
+# Reproducing the paper-scale application
+
+To approach the paper, with the **real** DHS data assembled via
+`covariates_kenya.R`:
+
+* Use all 1584 clusters and the six real covariate rasters; keep the county x
+  urban/rural strata.
+* CV: `run_cv_section6(sim_like, reps = 1:10, prop_train = 1267/1584)` with
+  BARTSIMP `ndpost = 1000`, `nwarmup = 1000`.
+* Areal: `fit_bartsimp(obs, grid, return_draws = TRUE)` on a fine national grid,
+  then `aggregate_areal(..., level = "admin1")` and `"admin2"`.
+* Score per-child with fully predictive intervals if you want the paper's exact
+  numbers (add a $\sigma_e$ inflation to the mean-field intervals); the method
+  ranking is unchanged.
+
+**Runtime.** Stage-2 prediction uses the Woodbury closed form by default (see the
+Section 5 vignette), so it is cheap; the C++ sampler (Stage 1), which calls INLA
+once per MCMC iteration, dominates a full run. Budget an overnight job for the
+paper-scale CV sweep.
+
+# Session information
+
+```{r session}
+sessionInfo()
+```

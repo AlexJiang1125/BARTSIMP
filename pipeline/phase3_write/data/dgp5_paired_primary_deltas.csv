@@ -1,0 +1,6 @@
+"quantity","value","mc_se","n_pair"
+"delta_cov80",0.01447,0.01023,24
+"delta_abs_bias",-0.00066,0.00033,24
+"delta_post_sd",-4e-04,0.00014,24
+"frac_reps_bias_reduced",0.625,NA,24
+"frac_reps_cov80_up",0.41667,NA,24

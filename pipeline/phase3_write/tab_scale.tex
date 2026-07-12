@@ -1,0 +1,30 @@
+% tab_scale.tex --- aggregation-scale sweep (12 reps/cell), legacy vs SD.
+% Numbers from data/dgp5_scale_aggregated.csv (Phase-2 validated).
+\begin{table}[t]
+\centering
+\small
+\caption{Aggregation-scale sweep ($A\in\{5,20,40\}$, 12 reps/cell, $\sigma_{gp}=0.5$).
+The floored arm is at least as well-covered as legacy at every scale; the advantage
+is largest at $A=20$ (most center-bias room) and shrinks at $A=40$ where legacy
+already sits near nominal (anomaly~A5)---a targeted recentering knob, not a universal
+inflator. Pixel coverage and the ratio stay in band. Monte-Carlo SE in parentheses.}
+\label{tab:scale}
+\begin{tabular}{c l rr r r}
+\toprule
+$A$ & Arm & Admin-1 $\cov_{80}$ & Admin-1 $\cov_{95}$ & $\ratio$ & pixel $\cov_{80}$ \\
+\midrule
+\multirow{2}{*}{$5$}  & legacy ($\dz{=}0$) & $0.833\;(0.059)$ & $0.933$ & $0.956$ & $0.866$ \\
+                      & \bartsimpsd{}      & $0.850\;(0.056)$ & $0.933$ & $0.938$ & $0.864$ \\
+\midrule
+\multirow{2}{*}{$20$} & legacy ($\dz{=}0$) & $0.782\;(0.022)$ & $0.937$ & $0.991$ & $0.866$ \\
+                      & \bartsimpsd{}      & $0.816\;(0.024)$ & $0.925$ & $0.984$ & $0.864$ \\
+\midrule
+\multirow{2}{*}{$40$} & legacy ($\dz{=}0$) & $0.797\;(0.019)$ & $0.931$ & $0.998$ & $0.866$ \\
+                      & \bartsimpsd{}      & $0.803\;(0.019)$ & $0.946$ & $0.990$ & $0.864$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+{\footnotesize $\Delta\cov_{80}=+0.017$ ($A{=}5$), $+0.034$ ($A{=}20$), $+0.006$
+($A{=}40$). The advantage is monotone-decreasing in $A$ as legacy approaches nominal.}
+\end{table}
